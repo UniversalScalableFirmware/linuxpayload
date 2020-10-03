@@ -1,0 +1,28 @@
+#!/bin/hush
+
+export HOME=/home
+export PATH=/bin:/sbin
+
+# Mount filesystems
+mount -t proc proc proc
+mount -t sysfs sys sys
+mount -t devtmpfs dev dev
+mkdir -p dev/pts
+mount -t devpts dev/pts dev/pts
+# /tmp inherited from initmpfs
+
+for n in $(cat '/sys/class/tty/console/active') 
+do
+  if ! [[ $n == tty0 ]]; then
+    exec /bin/sh </dev/$n >/dev/$n 2>/dev/$n
+  fi
+done
+
+exec /bin/sh
+
+cd /
+umount ./dev/pts
+umount ./dev
+umount ./sys
+umount ./proc
+sync

@@ -1,0 +1,6251 @@
+From 0150ac6dfe0eaeb452dbd9b783a59ec06953264a Mon Sep 17 00:00:00 2001
+From: Maurice Ma <maurice.ma@intel.com>
+Date: Fri, 2 Oct 2020 14:44:34 -0700
+Subject: [PATCH] Enable universal payload x64 kernel
+
+Signed-off-by: Maurice Ma <maurice.ma@intel.com>
+---
+ arch/x86/boot/compressed/head_64.S         |   11 +-
+ arch/x86/configs/upld_defconfig            | 2482 ++++++++++++++++++++++++++++
+ arch/x86/include/asm/uefi_processor_bind.h |  649 ++++++++
+ build                                      |    5 +
+ drivers/firmware/efi/libstub/Makefile      |    2 +-
+ drivers/firmware/efi/libstub/efistub.h     |    3 +
+ drivers/firmware/efi/libstub/upayload.c    |  427 +++++
+ drivers/firmware/efi/libstub/upayload.h    |  277 ++++
+ drivers/firmware/efi/libstub/x86-stub.c    |    5 +
+ include/linux/uefi_base.h                  | 1319 +++++++++++++++
+ include/linux/uefi_base_type.h             |  290 ++++
+ include/linux/uefi_multi_phase.h           |   87 +
+ include/linux/uefi_pi_bootmode.h           |   36 +
+ include/linux/uefi_pi_hob.h                |  512 ++++++
+ 14 files changed, 6102 insertions(+), 3 deletions(-)
+ create mode 100644 arch/x86/configs/upld_defconfig
+ create mode 100644 arch/x86/include/asm/uefi_processor_bind.h
+ create mode 100755 build
+ create mode 100644 drivers/firmware/efi/libstub/upayload.c
+ create mode 100644 drivers/firmware/efi/libstub/upayload.h
+ create mode 100644 include/linux/uefi_base.h
+ create mode 100644 include/linux/uefi_base_type.h
+ create mode 100644 include/linux/uefi_multi_phase.h
+ create mode 100644 include/linux/uefi_pi_bootmode.h
+ create mode 100644 include/linux/uefi_pi_hob.h
+
+diff --git a/arch/x86/boot/compressed/head_64.S b/arch/x86/boot/compressed/head_64.S
+index 97d37f0..b76e316 100644
+--- a/arch/x86/boot/compressed/head_64.S
++++ b/arch/x86/boot/compressed/head_64.S
+@@ -13,9 +13,9 @@
+  * the page directory. [According to comments etc elsewhere on a compressed
+  * kernel it will end up at 0x1000 + 1Mb I hope so as I assume this. - AC]
+  *
+- * Page 0 is deliberately kept safe, since System Management Mode code in 
++ * Page 0 is deliberately kept safe, since System Management Mode code in
+  * laptops may need to access the BIOS data stored there.  This is also
+- * useful for future device drivers that either access the BIOS via VM86 
++ * useful for future device drivers that either access the BIOS via VM86
+  * mode.
+  */
+ 
+@@ -522,6 +522,13 @@ SYM_FUNC_START_ALIAS(efi_stub_entry)
+ 	jmp	*%rax
+ SYM_FUNC_END(efi64_stub_entry)
+ SYM_FUNC_END_ALIAS(efi_stub_entry)
++
++SYM_FUNC_START(upld_stub_entry)
++	and	  $~0xf, %rsp			/* realign the stack */
++	movq  %rdi, %rax
++  leaq	startup_64(%rax), %rax
++	jmp  	*%rax
++SYM_FUNC_END(upld_stub_entry)
+ #endif
+ 
+ 	.text
+diff --git a/arch/x86/configs/upld_defconfig b/arch/x86/configs/upld_defconfig
+new file mode 100644
+index 0000000..fcf49e6
+--- /dev/null
++++ b/arch/x86/configs/upld_defconfig
+@@ -0,0 +1,2482 @@
++#
++# Automatically generated file; DO NOT EDIT.
++# Linux/x86_64 5.8.0 Kernel Configuration
++#
++CONFIG_CC_VERSION_TEXT="gcc (Ubuntu 7.4.0-1ubuntu1~16.04~ppa1) 7.4.0"
++CONFIG_CC_IS_GCC=y
++CONFIG_GCC_VERSION=70400
++CONFIG_LD_VERSION=226010000
++CONFIG_CLANG_VERSION=0
++CONFIG_CC_CAN_LINK=y
++CONFIG_CC_CAN_LINK_STATIC=y
++CONFIG_CC_HAS_ASM_GOTO=y
++CONFIG_IRQ_WORK=y
++CONFIG_BUILDTIME_TABLE_SORT=y
++CONFIG_THREAD_INFO_IN_TASK=y
++
++#
++# General setup
++#
++CONFIG_INIT_ENV_ARG_LIMIT=32
++# CONFIG_COMPILE_TEST is not set
++CONFIG_LOCALVERSION=""
++# CONFIG_LOCALVERSION_AUTO is not set
++CONFIG_BUILD_SALT=""
++CONFIG_HAVE_KERNEL_GZIP=y
++CONFIG_HAVE_KERNEL_BZIP2=y
++CONFIG_HAVE_KERNEL_LZMA=y
++CONFIG_HAVE_KERNEL_XZ=y
++CONFIG_HAVE_KERNEL_LZO=y
++CONFIG_HAVE_KERNEL_LZ4=y
++# CONFIG_KERNEL_GZIP is not set
++# CONFIG_KERNEL_BZIP2 is not set
++# CONFIG_KERNEL_LZMA is not set
++CONFIG_KERNEL_XZ=y
++# CONFIG_KERNEL_LZO is not set
++# CONFIG_KERNEL_LZ4 is not set
++CONFIG_DEFAULT_INIT=""
++CONFIG_DEFAULT_HOSTNAME="mini"
++# CONFIG_SWAP is not set
++# CONFIG_SYSVIPC is not set
++# CONFIG_WATCH_QUEUE is not set
++# CONFIG_CROSS_MEMORY_ATTACH is not set
++# CONFIG_USELIB is not set
++CONFIG_HAVE_ARCH_AUDITSYSCALL=y
++
++#
++# IRQ subsystem
++#
++CONFIG_GENERIC_IRQ_PROBE=y
++CONFIG_GENERIC_IRQ_SHOW=y
++CONFIG_GENERIC_IRQ_EFFECTIVE_AFF_MASK=y
++CONFIG_GENERIC_PENDING_IRQ=y
++CONFIG_GENERIC_IRQ_MIGRATION=y
++CONFIG_HARDIRQS_SW_RESEND=y
++CONFIG_IRQ_DOMAIN=y
++CONFIG_IRQ_DOMAIN_HIERARCHY=y
++CONFIG_GENERIC_MSI_IRQ=y
++CONFIG_GENERIC_MSI_IRQ_DOMAIN=y
++CONFIG_GENERIC_IRQ_MATRIX_ALLOCATOR=y
++CONFIG_GENERIC_IRQ_RESERVATION_MODE=y
++CONFIG_IRQ_FORCED_THREADING=y
++CONFIG_SPARSE_IRQ=y
++# CONFIG_GENERIC_IRQ_DEBUGFS is not set
++# end of IRQ subsystem
++
++CONFIG_CLOCKSOURCE_WATCHDOG=y
++CONFIG_ARCH_CLOCKSOURCE_INIT=y
++CONFIG_CLOCKSOURCE_VALIDATE_LAST_CYCLE=y
++CONFIG_GENERIC_TIME_VSYSCALL=y
++CONFIG_GENERIC_CLOCKEVENTS=y
++CONFIG_GENERIC_CLOCKEVENTS_BROADCAST=y
++CONFIG_GENERIC_CLOCKEVENTS_MIN_ADJUST=y
++CONFIG_GENERIC_CMOS_UPDATE=y
++
++#
++# Timers subsystem
++#
++CONFIG_TICK_ONESHOT=y
++CONFIG_HZ_PERIODIC=y
++# CONFIG_NO_HZ_IDLE is not set
++# CONFIG_NO_HZ_FULL is not set
++# CONFIG_NO_HZ is not set
++CONFIG_HIGH_RES_TIMERS=y
++# end of Timers subsystem
++
++CONFIG_PREEMPT_NONE=y
++# CONFIG_PREEMPT_VOLUNTARY is not set
++# CONFIG_PREEMPT is not set
++
++#
++# CPU/Task time and stats accounting
++#
++CONFIG_TICK_CPU_ACCOUNTING=y
++# CONFIG_VIRT_CPU_ACCOUNTING_GEN is not set
++# CONFIG_IRQ_TIME_ACCOUNTING is not set
++# CONFIG_SCHED_THERMAL_PRESSURE is not set
++# CONFIG_PSI is not set
++# end of CPU/Task time and stats accounting
++
++CONFIG_CPU_ISOLATION=y
++
++#
++# RCU Subsystem
++#
++CONFIG_TREE_RCU=y
++# CONFIG_RCU_EXPERT is not set
++CONFIG_SRCU=y
++CONFIG_TREE_SRCU=y
++CONFIG_RCU_STALL_COMMON=y
++CONFIG_RCU_NEED_SEGCBLIST=y
++# end of RCU Subsystem
++
++# CONFIG_IKCONFIG is not set
++# CONFIG_IKHEADERS is not set
++CONFIG_LOG_BUF_SHIFT=17
++CONFIG_LOG_CPU_MAX_BUF_SHIFT=12
++CONFIG_PRINTK_SAFE_LOG_BUF_SHIFT=13
++CONFIG_HAVE_UNSTABLE_SCHED_CLOCK=y
++
++#
++# Scheduler features
++#
++# CONFIG_UCLAMP_TASK is not set
++# end of Scheduler features
++
++CONFIG_ARCH_SUPPORTS_NUMA_BALANCING=y
++CONFIG_ARCH_WANT_BATCHED_UNMAP_TLB_FLUSH=y
++CONFIG_CC_HAS_INT128=y
++CONFIG_ARCH_SUPPORTS_INT128=y
++# CONFIG_CGROUPS is not set
++# CONFIG_CHECKPOINT_RESTORE is not set
++# CONFIG_SCHED_AUTOGROUP is not set
++# CONFIG_SYSFS_DEPRECATED is not set
++# CONFIG_RELAY is not set
++CONFIG_BLK_DEV_INITRD=y
++CONFIG_INITRAMFS_SOURCE="../output/initramfs.cpio"
++CONFIG_INITRAMFS_ROOT_UID=0
++CONFIG_INITRAMFS_ROOT_GID=0
++CONFIG_RD_GZIP=y
++# CONFIG_RD_BZIP2 is not set
++# CONFIG_RD_LZMA is not set
++CONFIG_RD_XZ=y
++# CONFIG_RD_LZO is not set
++# CONFIG_RD_LZ4 is not set
++CONFIG_INITRAMFS_COMPRESSION_GZIP=y
++# CONFIG_INITRAMFS_COMPRESSION_XZ is not set
++# CONFIG_INITRAMFS_COMPRESSION_NONE is not set
++# CONFIG_BOOT_CONFIG is not set
++# CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE is not set
++CONFIG_CC_OPTIMIZE_FOR_SIZE=y
++CONFIG_SYSCTL=y
++CONFIG_SYSCTL_EXCEPTION_TRACE=y
++CONFIG_HAVE_PCSPKR_PLATFORM=y
++CONFIG_EXPERT=y
++# CONFIG_MULTIUSER is not set
++# CONFIG_SGETMASK_SYSCALL is not set
++# CONFIG_SYSFS_SYSCALL is not set
++# CONFIG_FHANDLE is not set
++CONFIG_POSIX_TIMERS=y
++CONFIG_PRINTK=y
++CONFIG_PRINTK_NMI=y
++# CONFIG_BUG is not set
++# CONFIG_PCSPKR_PLATFORM is not set
++# CONFIG_BASE_FULL is not set
++# CONFIG_FUTEX is not set
++# CONFIG_EPOLL is not set
++# CONFIG_SIGNALFD is not set
++# CONFIG_TIMERFD is not set
++# CONFIG_EVENTFD is not set
++# CONFIG_SHMEM is not set
++# CONFIG_AIO is not set
++CONFIG_IO_URING=y
++# CONFIG_ADVISE_SYSCALLS is not set
++# CONFIG_MEMBARRIER is not set
++# CONFIG_KALLSYMS is not set
++# CONFIG_BPF_SYSCALL is not set
++CONFIG_ARCH_WANT_DEFAULT_BPF_JIT=y
++# CONFIG_USERFAULTFD is not set
++CONFIG_ARCH_HAS_MEMBARRIER_SYNC_CORE=y
++# CONFIG_RSEQ is not set
++CONFIG_EMBEDDED=y
++CONFIG_HAVE_PERF_EVENTS=y
++# CONFIG_PC104 is not set
++
++#
++# Kernel Performance Events And Counters
++#
++CONFIG_PERF_EVENTS=y
++# CONFIG_DEBUG_PERF_USE_VMALLOC is not set
++# end of Kernel Performance Events And Counters
++
++# CONFIG_VM_EVENT_COUNTERS is not set
++# CONFIG_COMPAT_BRK is not set
++# CONFIG_SLAB is not set
++# CONFIG_SLUB is not set
++CONFIG_SLOB=y
++# CONFIG_SLAB_MERGE_DEFAULT is not set
++# CONFIG_SHUFFLE_PAGE_ALLOCATOR is not set
++# CONFIG_PROFILING is not set
++# end of General setup
++
++CONFIG_64BIT=y
++CONFIG_X86_64=y
++CONFIG_X86=y
++CONFIG_INSTRUCTION_DECODER=y
++CONFIG_OUTPUT_FORMAT="elf64-x86-64"
++CONFIG_LOCKDEP_SUPPORT=y
++CONFIG_STACKTRACE_SUPPORT=y
++CONFIG_MMU=y
++CONFIG_ARCH_MMAP_RND_BITS_MIN=28
++CONFIG_ARCH_MMAP_RND_BITS_MAX=32
++CONFIG_ARCH_MMAP_RND_COMPAT_BITS_MIN=8
++CONFIG_ARCH_MMAP_RND_COMPAT_BITS_MAX=16
++CONFIG_GENERIC_ISA_DMA=y
++CONFIG_ARCH_MAY_HAVE_PC_FDC=y
++CONFIG_GENERIC_CALIBRATE_DELAY=y
++CONFIG_ARCH_HAS_CPU_RELAX=y
++CONFIG_ARCH_HAS_CACHE_LINE_SIZE=y
++CONFIG_ARCH_HAS_FILTER_PGPROT=y
++CONFIG_HAVE_SETUP_PER_CPU_AREA=y
++CONFIG_NEED_PER_CPU_EMBED_FIRST_CHUNK=y
++CONFIG_NEED_PER_CPU_PAGE_FIRST_CHUNK=y
++CONFIG_ARCH_HIBERNATION_POSSIBLE=y
++CONFIG_ARCH_SUSPEND_POSSIBLE=y
++CONFIG_ARCH_WANT_GENERAL_HUGETLB=y
++CONFIG_ZONE_DMA32=y
++CONFIG_AUDIT_ARCH=y
++CONFIG_ARCH_SUPPORTS_DEBUG_PAGEALLOC=y
++CONFIG_X86_64_SMP=y
++CONFIG_ARCH_SUPPORTS_UPROBES=y
++CONFIG_FIX_EARLYCON_MEM=y
++CONFIG_PGTABLE_LEVELS=4
++CONFIG_CC_HAS_SANE_STACKPROTECTOR=y
++
++#
++# Processor type and features
++#
++# CONFIG_ZONE_DMA is not set
++CONFIG_SMP=y
++CONFIG_X86_FEATURE_NAMES=y
++# CONFIG_X86_MPPARSE is not set
++# CONFIG_GOLDFISH is not set
++CONFIG_RETPOLINE=y
++# CONFIG_X86_CPU_RESCTRL is not set
++# CONFIG_X86_EXTENDED_PLATFORM is not set
++# CONFIG_X86_INTEL_LPSS is not set
++# CONFIG_X86_AMD_PLATFORM_DEVICE is not set
++CONFIG_IOSF_MBI=y
++# CONFIG_IOSF_MBI_DEBUG is not set
++CONFIG_X86_SUPPORTS_MEMORY_FAILURE=y
++# CONFIG_SCHED_OMIT_FRAME_POINTER is not set
++# CONFIG_HYPERVISOR_GUEST is not set
++# CONFIG_MK8 is not set
++# CONFIG_MPSC is not set
++# CONFIG_MCORE2 is not set
++CONFIG_MATOM=y
++# CONFIG_GENERIC_CPU is not set
++CONFIG_X86_INTERNODE_CACHE_SHIFT=6
++CONFIG_X86_L1_CACHE_SHIFT=6
++CONFIG_X86_USE_PPRO_CHECKSUM=y
++CONFIG_X86_TSC=y
++CONFIG_X86_CMPXCHG64=y
++CONFIG_X86_CMOV=y
++CONFIG_X86_MINIMUM_CPU_FAMILY=64
++CONFIG_X86_DEBUGCTLMSR=y
++CONFIG_IA32_FEAT_CTL=y
++CONFIG_X86_VMX_FEATURE_NAMES=y
++# CONFIG_PROCESSOR_SELECT is not set
++CONFIG_CPU_SUP_INTEL=y
++CONFIG_CPU_SUP_AMD=y
++CONFIG_CPU_SUP_HYGON=y
++CONFIG_CPU_SUP_CENTAUR=y
++CONFIG_CPU_SUP_ZHAOXIN=y
++CONFIG_HPET_TIMER=y
++CONFIG_DMI=y
++# CONFIG_GART_IOMMU is not set
++# CONFIG_MAXSMP is not set
++CONFIG_NR_CPUS_RANGE_BEGIN=2
++CONFIG_NR_CPUS_RANGE_END=512
++CONFIG_NR_CPUS_DEFAULT=64
++CONFIG_NR_CPUS=64
++CONFIG_SCHED_SMT=y
++CONFIG_SCHED_MC=y
++CONFIG_SCHED_MC_PRIO=y
++CONFIG_X86_LOCAL_APIC=y
++CONFIG_X86_IO_APIC=y
++# CONFIG_X86_REROUTE_FOR_BROKEN_BOOT_IRQS is not set
++CONFIG_X86_MCE=y
++# CONFIG_X86_MCELOG_LEGACY is not set
++CONFIG_X86_MCE_INTEL=y
++# CONFIG_X86_MCE_AMD is not set
++CONFIG_X86_MCE_THRESHOLD=y
++# CONFIG_X86_MCE_INJECT is not set
++CONFIG_X86_THERMAL_VECTOR=y
++
++#
++# Performance monitoring
++#
++# CONFIG_PERF_EVENTS_INTEL_UNCORE is not set
++# CONFIG_PERF_EVENTS_INTEL_RAPL is not set
++# CONFIG_PERF_EVENTS_INTEL_CSTATE is not set
++# CONFIG_PERF_EVENTS_AMD_POWER is not set
++# end of Performance monitoring
++
++# CONFIG_X86_VSYSCALL_EMULATION is not set
++CONFIG_X86_IOPL_IOPERM=y
++# CONFIG_I8K is not set
++# CONFIG_MICROCODE is not set
++# CONFIG_X86_MSR is not set
++# CONFIG_X86_CPUID is not set
++# CONFIG_X86_5LEVEL is not set
++CONFIG_X86_DIRECT_GBPAGES=y
++# CONFIG_X86_CPA_STATISTICS is not set
++# CONFIG_AMD_MEM_ENCRYPT is not set
++# CONFIG_NUMA is not set
++CONFIG_ARCH_SPARSEMEM_ENABLE=y
++CONFIG_ARCH_SPARSEMEM_DEFAULT=y
++CONFIG_ARCH_SELECT_MEMORY_MODEL=y
++CONFIG_ILLEGAL_POINTER_VALUE=0xdead000000000000
++# CONFIG_X86_PMEM_LEGACY is not set
++# CONFIG_X86_CHECK_BIOS_CORRUPTION is not set
++CONFIG_X86_RESERVE_LOW=64
++# CONFIG_MTRR is not set
++# CONFIG_ARCH_RANDOM is not set
++# CONFIG_X86_SMAP is not set
++CONFIG_X86_UMIP=y
++# CONFIG_X86_INTEL_MEMORY_PROTECTION_KEYS is not set
++CONFIG_X86_INTEL_TSX_MODE_OFF=y
++# CONFIG_X86_INTEL_TSX_MODE_ON is not set
++# CONFIG_X86_INTEL_TSX_MODE_AUTO is not set
++CONFIG_EFI=y
++CONFIG_EFI_STUB=y
++# CONFIG_EFI_MIXED is not set
++# CONFIG_SECCOMP is not set
++# CONFIG_HZ_100 is not set
++CONFIG_HZ_250=y
++# CONFIG_HZ_300 is not set
++# CONFIG_HZ_1000 is not set
++CONFIG_HZ=250
++CONFIG_SCHED_HRTICK=y
++# CONFIG_KEXEC is not set
++# CONFIG_KEXEC_FILE is not set
++# CONFIG_CRASH_DUMP is not set
++CONFIG_PHYSICAL_START=0x1000000
++CONFIG_RELOCATABLE=y
++CONFIG_RANDOMIZE_BASE=y
++CONFIG_X86_NEED_RELOCS=y
++CONFIG_PHYSICAL_ALIGN=0x200000
++CONFIG_DYNAMIC_MEMORY_LAYOUT=y
++CONFIG_RANDOMIZE_MEMORY=y
++CONFIG_RANDOMIZE_MEMORY_PHYSICAL_PADDING=0x0
++CONFIG_HOTPLUG_CPU=y
++# CONFIG_BOOTPARAM_HOTPLUG_CPU0 is not set
++# CONFIG_DEBUG_HOTPLUG_CPU0 is not set
++# CONFIG_LEGACY_VSYSCALL_EMULATE is not set
++# CONFIG_LEGACY_VSYSCALL_XONLY is not set
++CONFIG_LEGACY_VSYSCALL_NONE=y
++# CONFIG_CMDLINE_BOOL is not set
++# CONFIG_MODIFY_LDT_SYSCALL is not set
++CONFIG_HAVE_LIVEPATCH=y
++# end of Processor type and features
++
++CONFIG_ARCH_HAS_ADD_PAGES=y
++CONFIG_ARCH_ENABLE_MEMORY_HOTPLUG=y
++CONFIG_ARCH_ENABLE_SPLIT_PMD_PTLOCK=y
++
++#
++# Power management and ACPI options
++#
++# CONFIG_SUSPEND is not set
++# CONFIG_PM is not set
++# CONFIG_ENERGY_MODEL is not set
++CONFIG_ARCH_SUPPORTS_ACPI=y
++CONFIG_ACPI=y
++CONFIG_ACPI_LEGACY_TABLES_LOOKUP=y
++CONFIG_ARCH_MIGHT_HAVE_ACPI_PDC=y
++CONFIG_ACPI_SYSTEM_POWER_STATES_SUPPORT=y
++# CONFIG_ACPI_DEBUGGER is not set
++# CONFIG_ACPI_SPCR_TABLE is not set
++CONFIG_ACPI_LPIT=y
++# CONFIG_ACPI_PROCFS_POWER is not set
++# CONFIG_ACPI_REV_OVERRIDE_POSSIBLE is not set
++# CONFIG_ACPI_EC_DEBUGFS is not set
++# CONFIG_ACPI_AC is not set
++# CONFIG_ACPI_BATTERY is not set
++# CONFIG_ACPI_BUTTON is not set
++# CONFIG_ACPI_TINY_POWER_BUTTON is not set
++CONFIG_ACPI_FAN=y
++# CONFIG_ACPI_DOCK is not set
++CONFIG_ACPI_CPU_FREQ_PSS=y
++CONFIG_ACPI_PROCESSOR_CSTATE=y
++CONFIG_ACPI_PROCESSOR_IDLE=y
++CONFIG_ACPI_CPPC_LIB=y
++CONFIG_ACPI_PROCESSOR=y
++CONFIG_ACPI_HOTPLUG_CPU=y
++# CONFIG_ACPI_PROCESSOR_AGGREGATOR is not set
++CONFIG_ACPI_THERMAL=y
++CONFIG_ACPI_CUSTOM_DSDT_FILE=""
++CONFIG_ARCH_HAS_ACPI_TABLE_UPGRADE=y
++# CONFIG_ACPI_TABLE_UPGRADE is not set
++# CONFIG_ACPI_DEBUG is not set
++# CONFIG_ACPI_PCI_SLOT is not set
++CONFIG_ACPI_CONTAINER=y
++CONFIG_ACPI_HOTPLUG_IOAPIC=y
++# CONFIG_ACPI_SBS is not set
++# CONFIG_ACPI_HED is not set
++# CONFIG_ACPI_CUSTOM_METHOD is not set
++# CONFIG_ACPI_BGRT is not set
++# CONFIG_ACPI_REDUCED_HARDWARE_ONLY is not set
++# CONFIG_ACPI_NFIT is not set
++CONFIG_HAVE_ACPI_APEI=y
++CONFIG_HAVE_ACPI_APEI_NMI=y
++# CONFIG_ACPI_APEI is not set
++# CONFIG_DPTF_POWER is not set
++# CONFIG_PMIC_OPREGION is not set
++# CONFIG_ACPI_CONFIGFS is not set
++CONFIG_X86_PM_TIMER=y
++# CONFIG_SFI is not set
++
++#
++# CPU Frequency scaling
++#
++CONFIG_CPU_FREQ=y
++CONFIG_CPU_FREQ_GOV_ATTR_SET=y
++# CONFIG_CPU_FREQ_STAT is not set
++CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE=y
++# CONFIG_CPU_FREQ_DEFAULT_GOV_POWERSAVE is not set
++# CONFIG_CPU_FREQ_DEFAULT_GOV_USERSPACE is not set
++# CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND is not set
++# CONFIG_CPU_FREQ_DEFAULT_GOV_CONSERVATIVE is not set
++# CONFIG_CPU_FREQ_DEFAULT_GOV_SCHEDUTIL is not set
++CONFIG_CPU_FREQ_GOV_PERFORMANCE=y
++# CONFIG_CPU_FREQ_GOV_POWERSAVE is not set
++# CONFIG_CPU_FREQ_GOV_USERSPACE is not set
++# CONFIG_CPU_FREQ_GOV_ONDEMAND is not set
++# CONFIG_CPU_FREQ_GOV_CONSERVATIVE is not set
++CONFIG_CPU_FREQ_GOV_SCHEDUTIL=y
++
++#
++# CPU frequency scaling drivers
++#
++CONFIG_X86_INTEL_PSTATE=y
++# CONFIG_X86_PCC_CPUFREQ is not set
++# CONFIG_X86_ACPI_CPUFREQ is not set
++# CONFIG_X86_SPEEDSTEP_CENTRINO is not set
++# CONFIG_X86_P4_CLOCKMOD is not set
++
++#
++# shared options
++#
++# end of CPU Frequency scaling
++
++#
++# CPU Idle
++#
++CONFIG_CPU_IDLE=y
++CONFIG_CPU_IDLE_GOV_LADDER=y
++# CONFIG_CPU_IDLE_GOV_MENU is not set
++# CONFIG_CPU_IDLE_GOV_TEO is not set
++# end of CPU Idle
++
++# CONFIG_INTEL_IDLE is not set
++# end of Power management and ACPI options
++
++#
++# Bus options (PCI etc.)
++#
++CONFIG_PCI_DIRECT=y
++CONFIG_PCI_MMCONFIG=y
++CONFIG_MMCONF_FAM10H=y
++# CONFIG_PCI_CNB20LE_QUIRK is not set
++# CONFIG_ISA_BUS is not set
++CONFIG_ISA_DMA_API=y
++CONFIG_AMD_NB=y
++# CONFIG_X86_SYSFB is not set
++# end of Bus options (PCI etc.)
++
++#
++# Binary Emulations
++#
++# CONFIG_IA32_EMULATION is not set
++# CONFIG_X86_X32 is not set
++# end of Binary Emulations
++
++#
++# Firmware Drivers
++#
++# CONFIG_EDD is not set
++# CONFIG_FIRMWARE_MEMMAP is not set
++CONFIG_DMIID=y
++# CONFIG_DMI_SYSFS is not set
++CONFIG_DMI_SCAN_MACHINE_NON_EFI_FALLBACK=y
++# CONFIG_ISCSI_IBFT is not set
++# CONFIG_FW_CFG_SYSFS is not set
++# CONFIG_GOOGLE_FIRMWARE is not set
++
++#
++# EFI (Extensible Firmware Interface) Support
++#
++# CONFIG_EFI_VARS is not set
++CONFIG_EFI_ESRT=y
++# CONFIG_EFI_FAKE_MEMMAP is not set
++CONFIG_EFI_RUNTIME_WRAPPERS=y
++CONFIG_EFI_GENERIC_STUB_INITRD_CMDLINE_LOADER=y
++# CONFIG_EFI_CAPSULE_LOADER is not set
++# CONFIG_EFI_TEST is not set
++# CONFIG_APPLE_PROPERTIES is not set
++# CONFIG_RESET_ATTACK_MITIGATION is not set
++# CONFIG_EFI_RCI2_TABLE is not set
++# CONFIG_EFI_DISABLE_PCI_DMA is not set
++# end of EFI (Extensible Firmware Interface) Support
++
++CONFIG_EFI_EARLYCON=y
++
++#
++# Tegra firmware driver
++#
++# end of Tegra firmware driver
++# end of Firmware Drivers
++
++CONFIG_HAVE_KVM=y
++# CONFIG_VIRTUALIZATION is not set
++CONFIG_AS_AVX512=y
++CONFIG_AS_SHA1_NI=y
++CONFIG_AS_SHA256_NI=y
++
++#
++# General architecture-dependent options
++#
++CONFIG_HOTPLUG_SMT=y
++CONFIG_HAVE_OPROFILE=y
++CONFIG_OPROFILE_NMI_TIMER=y
++# CONFIG_JUMP_LABEL is not set
++CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS=y
++CONFIG_ARCH_USE_BUILTIN_BSWAP=y
++CONFIG_HAVE_IOREMAP_PROT=y
++CONFIG_HAVE_KPROBES=y
++CONFIG_HAVE_KRETPROBES=y
++CONFIG_HAVE_OPTPROBES=y
++CONFIG_HAVE_KPROBES_ON_FTRACE=y
++CONFIG_HAVE_FUNCTION_ERROR_INJECTION=y
++CONFIG_HAVE_NMI=y
++CONFIG_HAVE_ARCH_TRACEHOOK=y
++CONFIG_HAVE_DMA_CONTIGUOUS=y
++CONFIG_GENERIC_SMP_IDLE_THREAD=y
++CONFIG_ARCH_HAS_FORTIFY_SOURCE=y
++CONFIG_ARCH_HAS_SET_MEMORY=y
++CONFIG_ARCH_HAS_SET_DIRECT_MAP=y
++CONFIG_HAVE_ARCH_THREAD_STRUCT_WHITELIST=y
++CONFIG_ARCH_WANTS_DYNAMIC_TASK_STRUCT=y
++CONFIG_HAVE_ASM_MODVERSIONS=y
++CONFIG_HAVE_REGS_AND_STACK_ACCESS_API=y
++CONFIG_HAVE_RSEQ=y
++CONFIG_HAVE_FUNCTION_ARG_ACCESS_API=y
++CONFIG_HAVE_HW_BREAKPOINT=y
++CONFIG_HAVE_MIXED_BREAKPOINTS_REGS=y
++CONFIG_HAVE_USER_RETURN_NOTIFIER=y
++CONFIG_HAVE_PERF_EVENTS_NMI=y
++CONFIG_HAVE_HARDLOCKUP_DETECTOR_PERF=y
++CONFIG_HAVE_PERF_REGS=y
++CONFIG_HAVE_PERF_USER_STACK_DUMP=y
++CONFIG_HAVE_ARCH_JUMP_LABEL=y
++CONFIG_HAVE_ARCH_JUMP_LABEL_RELATIVE=y
++CONFIG_ARCH_HAVE_NMI_SAFE_CMPXCHG=y
++CONFIG_HAVE_CMPXCHG_LOCAL=y
++CONFIG_HAVE_CMPXCHG_DOUBLE=y
++CONFIG_HAVE_ARCH_SECCOMP_FILTER=y
++CONFIG_HAVE_ARCH_STACKLEAK=y
++CONFIG_HAVE_STACKPROTECTOR=y
++CONFIG_CC_HAS_STACKPROTECTOR_NONE=y
++# CONFIG_STACKPROTECTOR is not set
++CONFIG_HAVE_ARCH_WITHIN_STACK_FRAMES=y
++CONFIG_HAVE_CONTEXT_TRACKING=y
++CONFIG_HAVE_VIRT_CPU_ACCOUNTING_GEN=y
++CONFIG_HAVE_IRQ_TIME_ACCOUNTING=y
++CONFIG_HAVE_MOVE_PMD=y
++CONFIG_HAVE_ARCH_TRANSPARENT_HUGEPAGE=y
++CONFIG_HAVE_ARCH_TRANSPARENT_HUGEPAGE_PUD=y
++CONFIG_HAVE_ARCH_HUGE_VMAP=y
++CONFIG_ARCH_WANT_HUGE_PMD_SHARE=y
++CONFIG_HAVE_ARCH_SOFT_DIRTY=y
++CONFIG_HAVE_MOD_ARCH_SPECIFIC=y
++CONFIG_MODULES_USE_ELF_RELA=y
++CONFIG_ARCH_HAS_ELF_RANDOMIZE=y
++CONFIG_HAVE_ARCH_MMAP_RND_BITS=y
++CONFIG_HAVE_EXIT_THREAD=y
++CONFIG_ARCH_MMAP_RND_BITS=28
++CONFIG_HAVE_COPY_THREAD_TLS=y
++CONFIG_HAVE_STACK_VALIDATION=y
++# CONFIG_COMPAT_32BIT_TIME is not set
++CONFIG_HAVE_ARCH_VMAP_STACK=y
++CONFIG_VMAP_STACK=y
++CONFIG_ARCH_HAS_STRICT_KERNEL_RWX=y
++CONFIG_STRICT_KERNEL_RWX=y
++CONFIG_ARCH_HAS_STRICT_MODULE_RWX=y
++CONFIG_HAVE_ARCH_PREL32_RELOCATIONS=y
++CONFIG_ARCH_USE_MEMREMAP_PROT=y
++# CONFIG_LOCK_EVENT_COUNTS is not set
++CONFIG_ARCH_HAS_MEM_ENCRYPT=y
++
++#
++# GCOV-based kernel profiling
++#
++# CONFIG_GCOV_KERNEL is not set
++CONFIG_ARCH_HAS_GCOV_PROFILE_ALL=y
++# end of GCOV-based kernel profiling
++
++CONFIG_HAVE_GCC_PLUGINS=y
++# end of General architecture-dependent options
++
++CONFIG_BASE_SMALL=1
++# CONFIG_MODULES is not set
++CONFIG_MODULES_TREE_LOOKUP=y
++CONFIG_BLOCK=y
++CONFIG_BLK_SCSI_REQUEST=y
++# CONFIG_BLK_DEV_BSG is not set
++# CONFIG_BLK_DEV_BSGLIB is not set
++# CONFIG_BLK_DEV_INTEGRITY is not set
++# CONFIG_BLK_DEV_ZONED is not set
++# CONFIG_BLK_CMDLINE_PARSER is not set
++# CONFIG_BLK_WBT is not set
++CONFIG_BLK_DEBUG_FS=y
++# CONFIG_BLK_SED_OPAL is not set
++# CONFIG_BLK_INLINE_ENCRYPTION is not set
++
++#
++# Partition Types
++#
++CONFIG_PARTITION_ADVANCED=y
++# CONFIG_ACORN_PARTITION is not set
++# CONFIG_AIX_PARTITION is not set
++# CONFIG_OSF_PARTITION is not set
++# CONFIG_AMIGA_PARTITION is not set
++# CONFIG_ATARI_PARTITION is not set
++# CONFIG_MAC_PARTITION is not set
++CONFIG_MSDOS_PARTITION=y
++# CONFIG_BSD_DISKLABEL is not set
++# CONFIG_MINIX_SUBPARTITION is not set
++# CONFIG_SOLARIS_X86_PARTITION is not set
++# CONFIG_UNIXWARE_DISKLABEL is not set
++# CONFIG_LDM_PARTITION is not set
++# CONFIG_SGI_PARTITION is not set
++# CONFIG_ULTRIX_PARTITION is not set
++# CONFIG_SUN_PARTITION is not set
++# CONFIG_KARMA_PARTITION is not set
++CONFIG_EFI_PARTITION=y
++# CONFIG_SYSV68_PARTITION is not set
++# CONFIG_CMDLINE_PARTITION is not set
++# end of Partition Types
++
++CONFIG_BLK_MQ_PCI=y
++
++#
++# IO Schedulers
++#
++CONFIG_MQ_IOSCHED_DEADLINE=y
++CONFIG_MQ_IOSCHED_KYBER=y
++# CONFIG_IOSCHED_BFQ is not set
++# end of IO Schedulers
++
++CONFIG_INLINE_SPIN_UNLOCK_IRQ=y
++CONFIG_INLINE_READ_UNLOCK=y
++CONFIG_INLINE_READ_UNLOCK_IRQ=y
++CONFIG_INLINE_WRITE_UNLOCK=y
++CONFIG_INLINE_WRITE_UNLOCK_IRQ=y
++CONFIG_ARCH_SUPPORTS_ATOMIC_RMW=y
++CONFIG_MUTEX_SPIN_ON_OWNER=y
++CONFIG_RWSEM_SPIN_ON_OWNER=y
++CONFIG_LOCK_SPIN_ON_OWNER=y
++CONFIG_ARCH_USE_QUEUED_SPINLOCKS=y
++CONFIG_QUEUED_SPINLOCKS=y
++CONFIG_ARCH_USE_QUEUED_RWLOCKS=y
++CONFIG_QUEUED_RWLOCKS=y
++CONFIG_ARCH_HAS_NON_OVERLAPPING_ADDRESS_SPACE=y
++CONFIG_ARCH_HAS_SYNC_CORE_BEFORE_USERMODE=y
++CONFIG_ARCH_HAS_SYSCALL_WRAPPER=y
++
++#
++# Executable file formats
++#
++CONFIG_BINFMT_ELF=y
++CONFIG_ELFCORE=y
++CONFIG_BINFMT_SCRIPT=y
++# CONFIG_BINFMT_MISC is not set
++# CONFIG_COREDUMP is not set
++# end of Executable file formats
++
++#
++# Memory Management options
++#
++CONFIG_SELECT_MEMORY_MODEL=y
++CONFIG_SPARSEMEM_MANUAL=y
++CONFIG_SPARSEMEM=y
++CONFIG_HAVE_MEMORY_PRESENT=y
++CONFIG_SPARSEMEM_EXTREME=y
++CONFIG_SPARSEMEM_VMEMMAP_ENABLE=y
++CONFIG_SPARSEMEM_VMEMMAP=y
++CONFIG_HAVE_FAST_GUP=y
++# CONFIG_MEMORY_HOTPLUG is not set
++CONFIG_SPLIT_PTLOCK_CPUS=4
++# CONFIG_COMPACTION is not set
++# CONFIG_PAGE_REPORTING is not set
++CONFIG_PHYS_ADDR_T_64BIT=y
++CONFIG_VIRT_TO_BUS=y
++# CONFIG_KSM is not set
++CONFIG_DEFAULT_MMAP_MIN_ADDR=4096
++CONFIG_ARCH_SUPPORTS_MEMORY_FAILURE=y
++# CONFIG_MEMORY_FAILURE is not set
++# CONFIG_TRANSPARENT_HUGEPAGE is not set
++CONFIG_ARCH_WANTS_THP_SWAP=y
++# CONFIG_CLEANCACHE is not set
++# CONFIG_CMA is not set
++# CONFIG_ZPOOL is not set
++# CONFIG_ZBUD is not set
++# CONFIG_ZSMALLOC is not set
++CONFIG_GENERIC_EARLY_IOREMAP=y
++# CONFIG_DEFERRED_STRUCT_PAGE_INIT is not set
++# CONFIG_IDLE_PAGE_TRACKING is not set
++CONFIG_ARCH_HAS_PTE_DEVMAP=y
++# CONFIG_PERCPU_STATS is not set
++# CONFIG_GUP_BENCHMARK is not set
++CONFIG_ARCH_HAS_PTE_SPECIAL=y
++# end of Memory Management options
++
++# CONFIG_NET is not set
++CONFIG_HAVE_EBPF_JIT=y
++
++#
++# Device Drivers
++#
++CONFIG_HAVE_EISA=y
++# CONFIG_EISA is not set
++CONFIG_HAVE_PCI=y
++CONFIG_PCI=y
++CONFIG_PCI_DOMAINS=y
++# CONFIG_PCIEPORTBUS is not set
++CONFIG_PCIEASPM=y
++CONFIG_PCIEASPM_DEFAULT=y
++# CONFIG_PCIEASPM_POWERSAVE is not set
++# CONFIG_PCIEASPM_POWER_SUPERSAVE is not set
++# CONFIG_PCIEASPM_PERFORMANCE is not set
++# CONFIG_PCIE_PTM is not set
++CONFIG_PCI_MSI=y
++CONFIG_PCI_MSI_IRQ_DOMAIN=y
++CONFIG_PCI_QUIRKS=y
++# CONFIG_PCI_DEBUG is not set
++# CONFIG_PCI_STUB is not set
++CONFIG_PCI_LOCKLESS_CONFIG=y
++# CONFIG_PCI_IOV is not set
++# CONFIG_PCI_PRI is not set
++# CONFIG_PCI_PASID is not set
++CONFIG_PCI_LABEL=y
++# CONFIG_HOTPLUG_PCI is not set
++
++#
++# PCI controller drivers
++#
++# CONFIG_VMD is not set
++
++#
++# DesignWare PCI Core Support
++#
++# CONFIG_PCIE_DW_PLAT_HOST is not set
++# CONFIG_PCI_MESON is not set
++# end of DesignWare PCI Core Support
++
++#
++# Mobiveil PCIe Core Support
++#
++# end of Mobiveil PCIe Core Support
++
++#
++# Cadence PCIe controllers support
++#
++# end of Cadence PCIe controllers support
++# end of PCI controller drivers
++
++#
++# PCI Endpoint
++#
++# CONFIG_PCI_ENDPOINT is not set
++# end of PCI Endpoint
++
++#
++# PCI switch controller drivers
++#
++# CONFIG_PCI_SW_SWITCHTEC is not set
++# end of PCI switch controller drivers
++
++# CONFIG_PCCARD is not set
++# CONFIG_RAPIDIO is not set
++
++#
++# Generic Driver Options
++#
++# CONFIG_UEVENT_HELPER is not set
++CONFIG_DEVTMPFS=y
++CONFIG_DEVTMPFS_MOUNT=y
++# CONFIG_STANDALONE is not set
++# CONFIG_PREVENT_FIRMWARE_BUILD is not set
++
++#
++# Firmware loader
++#
++# CONFIG_FW_LOADER is not set
++# end of Firmware loader
++
++# CONFIG_ALLOW_DEV_COREDUMP is not set
++# CONFIG_DEBUG_DRIVER is not set
++# CONFIG_DEBUG_DEVRES is not set
++# CONFIG_DEBUG_TEST_DRIVER_REMOVE is not set
++CONFIG_GENERIC_CPU_AUTOPROBE=y
++CONFIG_GENERIC_CPU_VULNERABILITIES=y
++# end of Generic Driver Options
++
++#
++# Bus devices
++#
++# CONFIG_MHI_BUS is not set
++# end of Bus devices
++
++# CONFIG_GNSS is not set
++# CONFIG_MTD is not set
++# CONFIG_OF is not set
++CONFIG_ARCH_MIGHT_HAVE_PC_PARPORT=y
++# CONFIG_PARPORT is not set
++CONFIG_PNP=y
++# CONFIG_PNP_DEBUG_MESSAGES is not set
++
++#
++# Protocols
++#
++CONFIG_PNPACPI=y
++CONFIG_BLK_DEV=y
++# CONFIG_BLK_DEV_NULL_BLK is not set
++# CONFIG_BLK_DEV_FD is not set
++# CONFIG_BLK_DEV_PCIESSD_MTIP32XX is not set
++# CONFIG_BLK_DEV_UMEM is not set
++CONFIG_BLK_DEV_LOOP=y
++CONFIG_BLK_DEV_LOOP_MIN_COUNT=8
++# CONFIG_BLK_DEV_CRYPTOLOOP is not set
++
++#
++# DRBD disabled because PROC_FS or INET not selected
++#
++# CONFIG_BLK_DEV_SKD is not set
++# CONFIG_BLK_DEV_SX8 is not set
++CONFIG_BLK_DEV_RAM=y
++CONFIG_BLK_DEV_RAM_COUNT=16
++CONFIG_BLK_DEV_RAM_SIZE=4096
++# CONFIG_CDROM_PKTCDVD is not set
++# CONFIG_BLK_DEV_RSXX is not set
++
++#
++# NVME Support
++#
++# CONFIG_BLK_DEV_NVME is not set
++# CONFIG_NVME_FC is not set
++# end of NVME Support
++
++#
++# Misc devices
++#
++# CONFIG_DUMMY_IRQ is not set
++# CONFIG_IBM_ASM is not set
++# CONFIG_PHANTOM is not set
++# CONFIG_TIFM_CORE is not set
++# CONFIG_ENCLOSURE_SERVICES is not set
++# CONFIG_HP_ILO is not set
++# CONFIG_SRAM is not set
++# CONFIG_PCI_ENDPOINT_TEST is not set
++# CONFIG_XILINX_SDFEC is not set
++# CONFIG_PVPANIC is not set
++# CONFIG_C2PORT is not set
++
++#
++# EEPROM support
++#
++# CONFIG_EEPROM_93CX6 is not set
++# end of EEPROM support
++
++# CONFIG_CB710_CORE is not set
++
++#
++# Texas Instruments shared transport line discipline
++#
++# end of Texas Instruments shared transport line discipline
++
++#
++# Altera FPGA firmware download module (requires I2C)
++#
++# CONFIG_INTEL_MEI is not set
++# CONFIG_INTEL_MEI_ME is not set
++# CONFIG_INTEL_MEI_TXE is not set
++# CONFIG_VMWARE_VMCI is not set
++
++#
++# Intel MIC & related support
++#
++# CONFIG_INTEL_MIC_BUS is not set
++# CONFIG_SCIF_BUS is not set
++# CONFIG_VOP_BUS is not set
++# end of Intel MIC & related support
++
++# CONFIG_GENWQE is not set
++# CONFIG_ECHO is not set
++# CONFIG_MISC_ALCOR_PCI is not set
++# CONFIG_MISC_RTSX_PCI is not set
++# CONFIG_MISC_RTSX_USB is not set
++# CONFIG_HABANA_AI is not set
++# end of Misc devices
++
++CONFIG_HAVE_IDE=y
++# CONFIG_IDE is not set
++
++#
++# SCSI device support
++#
++CONFIG_SCSI_MOD=y
++# CONFIG_RAID_ATTRS is not set
++CONFIG_SCSI=y
++CONFIG_SCSI_DMA=y
++# CONFIG_SCSI_PROC_FS is not set
++
++#
++# SCSI support type (disk, tape, CD-ROM)
++#
++CONFIG_BLK_DEV_SD=y
++# CONFIG_CHR_DEV_ST is not set
++# CONFIG_BLK_DEV_SR is not set
++# CONFIG_CHR_DEV_SG is not set
++# CONFIG_CHR_DEV_SCH is not set
++# CONFIG_SCSI_CONSTANTS is not set
++# CONFIG_SCSI_LOGGING is not set
++# CONFIG_SCSI_SCAN_ASYNC is not set
++
++#
++# SCSI Transports
++#
++# CONFIG_SCSI_SPI_ATTRS is not set
++# CONFIG_SCSI_SAS_ATTRS is not set
++# CONFIG_SCSI_SAS_LIBSAS is not set
++# CONFIG_SCSI_SRP_ATTRS is not set
++# end of SCSI Transports
++
++CONFIG_SCSI_LOWLEVEL=y
++# CONFIG_ISCSI_BOOT_SYSFS is not set
++# CONFIG_BLK_DEV_3W_XXXX_RAID is not set
++# CONFIG_SCSI_HPSA is not set
++# CONFIG_SCSI_3W_9XXX is not set
++# CONFIG_SCSI_3W_SAS is not set
++# CONFIG_SCSI_ACARD is not set
++# CONFIG_SCSI_AACRAID is not set
++# CONFIG_SCSI_AIC7XXX is not set
++# CONFIG_SCSI_AIC79XX is not set
++# CONFIG_SCSI_AIC94XX is not set
++# CONFIG_SCSI_MVSAS is not set
++# CONFIG_SCSI_MVUMI is not set
++# CONFIG_SCSI_DPT_I2O is not set
++# CONFIG_SCSI_ADVANSYS is not set
++# CONFIG_SCSI_ARCMSR is not set
++# CONFIG_SCSI_ESAS2R is not set
++# CONFIG_MEGARAID_NEWGEN is not set
++# CONFIG_MEGARAID_LEGACY is not set
++# CONFIG_MEGARAID_SAS is not set
++# CONFIG_SCSI_MPT3SAS is not set
++# CONFIG_SCSI_MPT2SAS is not set
++# CONFIG_SCSI_SMARTPQI is not set
++# CONFIG_SCSI_UFSHCD is not set
++# CONFIG_SCSI_HPTIOP is not set
++# CONFIG_SCSI_BUSLOGIC is not set
++# CONFIG_SCSI_MYRB is not set
++# CONFIG_SCSI_MYRS is not set
++# CONFIG_VMWARE_PVSCSI is not set
++# CONFIG_SCSI_SNIC is not set
++# CONFIG_SCSI_DMX3191D is not set
++# CONFIG_SCSI_FDOMAIN_PCI is not set
++# CONFIG_SCSI_GDTH is not set
++# CONFIG_SCSI_ISCI is not set
++# CONFIG_SCSI_IPS is not set
++# CONFIG_SCSI_INITIO is not set
++# CONFIG_SCSI_INIA100 is not set
++# CONFIG_SCSI_STEX is not set
++# CONFIG_SCSI_SYM53C8XX_2 is not set
++# CONFIG_SCSI_IPR is not set
++# CONFIG_SCSI_QLOGIC_1280 is not set
++# CONFIG_SCSI_DC395x is not set
++# CONFIG_SCSI_AM53C974 is not set
++# CONFIG_SCSI_WD719X is not set
++# CONFIG_SCSI_DEBUG is not set
++# CONFIG_SCSI_PM8001 is not set
++# CONFIG_SCSI_DH is not set
++# end of SCSI device support
++
++CONFIG_ATA=y
++CONFIG_SATA_HOST=y
++# CONFIG_ATA_VERBOSE_ERROR is not set
++CONFIG_ATA_FORCE=y
++# CONFIG_ATA_ACPI is not set
++# CONFIG_SATA_PMP is not set
++
++#
++# Controllers with non-SFF native interface
++#
++CONFIG_SATA_AHCI=y
++CONFIG_SATA_MOBILE_LPM_POLICY=0
++# CONFIG_SATA_AHCI_PLATFORM is not set
++# CONFIG_SATA_INIC162X is not set
++# CONFIG_SATA_ACARD_AHCI is not set
++# CONFIG_SATA_SIL24 is not set
++# CONFIG_ATA_SFF is not set
++# CONFIG_MD is not set
++# CONFIG_TARGET_CORE is not set
++# CONFIG_FUSION is not set
++
++#
++# IEEE 1394 (FireWire) support
++#
++# CONFIG_FIREWIRE is not set
++# CONFIG_FIREWIRE_NOSY is not set
++# end of IEEE 1394 (FireWire) support
++
++# CONFIG_MACINTOSH_DRIVERS is not set
++# CONFIG_NVM is not set
++
++#
++# Input device support
++#
++CONFIG_INPUT=y
++# CONFIG_INPUT_FF_MEMLESS is not set
++# CONFIG_INPUT_POLLDEV is not set
++# CONFIG_INPUT_SPARSEKMAP is not set
++# CONFIG_INPUT_MATRIXKMAP is not set
++
++#
++# Userland interfaces
++#
++# CONFIG_INPUT_MOUSEDEV is not set
++# CONFIG_INPUT_JOYDEV is not set
++# CONFIG_INPUT_EVDEV is not set
++# CONFIG_INPUT_EVBUG is not set
++
++#
++# Input Device Drivers
++#
++# CONFIG_INPUT_KEYBOARD is not set
++# CONFIG_INPUT_MOUSE is not set
++# CONFIG_INPUT_JOYSTICK is not set
++# CONFIG_INPUT_TABLET is not set
++# CONFIG_INPUT_TOUCHSCREEN is not set
++# CONFIG_INPUT_MISC is not set
++# CONFIG_RMI4_CORE is not set
++
++#
++# Hardware I/O ports
++#
++# CONFIG_SERIO is not set
++CONFIG_ARCH_MIGHT_HAVE_PC_SERIO=y
++# CONFIG_GAMEPORT is not set
++# end of Hardware I/O ports
++# end of Input device support
++
++#
++# Character devices
++#
++CONFIG_TTY=y
++CONFIG_VT=y
++CONFIG_CONSOLE_TRANSLATIONS=y
++CONFIG_VT_CONSOLE=y
++CONFIG_HW_CONSOLE=y
++CONFIG_VT_HW_CONSOLE_BINDING=y
++CONFIG_UNIX98_PTYS=y
++CONFIG_LEGACY_PTYS=y
++CONFIG_LEGACY_PTY_COUNT=256
++CONFIG_LDISC_AUTOLOAD=y
++
++#
++# Serial drivers
++#
++CONFIG_SERIAL_EARLYCON=y
++CONFIG_SERIAL_8250=y
++# CONFIG_SERIAL_8250_DEPRECATED_OPTIONS is not set
++CONFIG_SERIAL_8250_PNP=y
++# CONFIG_SERIAL_8250_16550A_VARIANTS is not set
++# CONFIG_SERIAL_8250_FINTEK is not set
++CONFIG_SERIAL_8250_CONSOLE=y
++CONFIG_SERIAL_8250_DMA=y
++CONFIG_SERIAL_8250_PCI=y
++# CONFIG_SERIAL_8250_EXAR is not set
++CONFIG_SERIAL_8250_NR_UARTS=4
++CONFIG_SERIAL_8250_RUNTIME_UARTS=4
++CONFIG_SERIAL_8250_EXTENDED=y
++# CONFIG_SERIAL_8250_MANY_PORTS is not set
++# CONFIG_SERIAL_8250_SHARE_IRQ is not set
++# CONFIG_SERIAL_8250_DETECT_IRQ is not set
++# CONFIG_SERIAL_8250_RSA is not set
++CONFIG_SERIAL_8250_DWLIB=y
++CONFIG_SERIAL_8250_DW=y
++# CONFIG_SERIAL_8250_RT288X is not set
++CONFIG_SERIAL_8250_LPSS=y
++CONFIG_SERIAL_8250_MID=y
++
++#
++# Non-8250 serial port support
++#
++# CONFIG_SERIAL_UARTLITE is not set
++CONFIG_SERIAL_CORE=y
++CONFIG_SERIAL_CORE_CONSOLE=y
++# CONFIG_SERIAL_JSM is not set
++# CONFIG_SERIAL_LANTIQ is not set
++# CONFIG_SERIAL_SCCNXP is not set
++# CONFIG_SERIAL_ALTERA_JTAGUART is not set
++# CONFIG_SERIAL_ALTERA_UART is not set
++# CONFIG_SERIAL_ARC is not set
++# CONFIG_SERIAL_RP2 is not set
++# CONFIG_SERIAL_FSL_LPUART is not set
++# CONFIG_SERIAL_FSL_LINFLEXUART is not set
++# CONFIG_SERIAL_SPRD is not set
++# end of Serial drivers
++
++# CONFIG_SERIAL_NONSTANDARD is not set
++# CONFIG_NOZOMI is not set
++# CONFIG_NULL_TTY is not set
++# CONFIG_TRACE_SINK is not set
++# CONFIG_SERIAL_DEV_BUS is not set
++# CONFIG_TTY_PRINTK is not set
++# CONFIG_IPMI_HANDLER is not set
++# CONFIG_HW_RANDOM is not set
++# CONFIG_APPLICOM is not set
++# CONFIG_MWAVE is not set
++# CONFIG_DEVMEM is not set
++# CONFIG_DEVKMEM is not set
++# CONFIG_NVRAM is not set
++# CONFIG_RAW_DRIVER is not set
++# CONFIG_DEVPORT is not set
++# CONFIG_HPET is not set
++# CONFIG_HANGCHECK_TIMER is not set
++# CONFIG_TCG_TPM is not set
++# CONFIG_TELCLOCK is not set
++# CONFIG_XILLYBUS is not set
++# end of Character devices
++
++# CONFIG_RANDOM_TRUST_BOOTLOADER is not set
++
++#
++# I2C support
++#
++# CONFIG_I2C is not set
++# end of I2C support
++
++# CONFIG_I3C is not set
++# CONFIG_SPI is not set
++# CONFIG_SPMI is not set
++# CONFIG_HSI is not set
++# CONFIG_PPS is not set
++
++#
++# PTP clock support
++#
++
++#
++# Enable PHYLIB and NETWORK_PHY_TIMESTAMPING to see the additional clocks.
++#
++# end of PTP clock support
++
++# CONFIG_PINCTRL is not set
++# CONFIG_GPIOLIB is not set
++# CONFIG_W1 is not set
++# CONFIG_POWER_AVS is not set
++# CONFIG_POWER_RESET is not set
++# CONFIG_POWER_SUPPLY is not set
++# CONFIG_HWMON is not set
++CONFIG_THERMAL=y
++# CONFIG_THERMAL_STATISTICS is not set
++CONFIG_THERMAL_EMERGENCY_POWEROFF_DELAY_MS=0
++CONFIG_THERMAL_WRITABLE_TRIPS=y
++CONFIG_THERMAL_DEFAULT_GOV_STEP_WISE=y
++# CONFIG_THERMAL_DEFAULT_GOV_FAIR_SHARE is not set
++# CONFIG_THERMAL_DEFAULT_GOV_USER_SPACE is not set
++# CONFIG_THERMAL_GOV_FAIR_SHARE is not set
++CONFIG_THERMAL_GOV_STEP_WISE=y
++# CONFIG_THERMAL_GOV_BANG_BANG is not set
++CONFIG_THERMAL_GOV_USER_SPACE=y
++# CONFIG_THERMAL_EMULATION is not set
++
++#
++# Intel thermal drivers
++#
++# CONFIG_INTEL_POWERCLAMP is not set
++CONFIG_X86_PKG_TEMP_THERMAL=y
++# CONFIG_INTEL_SOC_DTS_THERMAL is not set
++
++#
++# ACPI INT340X thermal drivers
++#
++# CONFIG_INT340X_THERMAL is not set
++# end of ACPI INT340X thermal drivers
++
++# CONFIG_INTEL_PCH_THERMAL is not set
++# end of Intel thermal drivers
++
++# CONFIG_WATCHDOG is not set
++CONFIG_SSB_POSSIBLE=y
++# CONFIG_SSB is not set
++CONFIG_BCMA_POSSIBLE=y
++# CONFIG_BCMA is not set
++
++#
++# Multifunction device drivers
++#
++CONFIG_MFD_CORE=y
++# CONFIG_MFD_MADERA is not set
++# CONFIG_MFD_DLN2 is not set
++# CONFIG_HTC_PASIC3 is not set
++# CONFIG_MFD_INTEL_QUARK_I2C_GPIO is not set
++# CONFIG_LPC_ICH is not set
++# CONFIG_LPC_SCH is not set
++CONFIG_MFD_INTEL_LPSS=y
++# CONFIG_MFD_INTEL_LPSS_ACPI is not set
++CONFIG_MFD_INTEL_LPSS_PCI=y
++# CONFIG_MFD_INTEL_PMC_BXT is not set
++# CONFIG_MFD_JANZ_CMODIO is not set
++# CONFIG_MFD_KEMPLD is not set
++# CONFIG_MFD_MT6397 is not set
++# CONFIG_MFD_VIPERBOARD is not set
++# CONFIG_MFD_RDC321X is not set
++# CONFIG_MFD_SM501 is not set
++# CONFIG_ABX500_CORE is not set
++# CONFIG_MFD_SYSCON is not set
++# CONFIG_MFD_TI_AM335X_TSCADC is not set
++# CONFIG_MFD_TQMX86 is not set
++# CONFIG_MFD_VX855 is not set
++# end of Multifunction device drivers
++
++# CONFIG_REGULATOR is not set
++# CONFIG_RC_CORE is not set
++# CONFIG_MEDIA_CEC_SUPPORT is not set
++# CONFIG_MEDIA_SUPPORT is not set
++
++#
++# Graphics support
++#
++# CONFIG_AGP is not set
++# CONFIG_VGA_ARB is not set
++# CONFIG_VGA_SWITCHEROO is not set
++# CONFIG_DRM is not set
++
++#
++# ARM devices
++#
++# end of ARM devices
++
++CONFIG_DRM_PANEL_ORIENTATION_QUIRKS=y
++
++#
++# Frame buffer Devices
++#
++CONFIG_FB_CMDLINE=y
++CONFIG_FB_NOTIFY=y
++CONFIG_FB=y
++# CONFIG_FIRMWARE_EDID is not set
++CONFIG_FB_CFB_FILLRECT=y
++CONFIG_FB_CFB_COPYAREA=y
++CONFIG_FB_CFB_IMAGEBLIT=y
++# CONFIG_FB_FOREIGN_ENDIAN is not set
++# CONFIG_FB_MODE_HELPERS is not set
++# CONFIG_FB_TILEBLITTING is not set
++
++#
++# Frame buffer hardware drivers
++#
++# CONFIG_FB_CIRRUS is not set
++# CONFIG_FB_PM2 is not set
++# CONFIG_FB_CYBER2000 is not set
++# CONFIG_FB_ARC is not set
++# CONFIG_FB_ASILIANT is not set
++# CONFIG_FB_IMSTT is not set
++# CONFIG_FB_VGA16 is not set
++# CONFIG_FB_VESA is not set
++CONFIG_FB_EFI=y
++# CONFIG_FB_N411 is not set
++# CONFIG_FB_HGA is not set
++# CONFIG_FB_OPENCORES is not set
++# CONFIG_FB_S1D13XXX is not set
++# CONFIG_FB_NVIDIA is not set
++# CONFIG_FB_RIVA is not set
++# CONFIG_FB_I740 is not set
++# CONFIG_FB_LE80578 is not set
++# CONFIG_FB_MATROX is not set
++# CONFIG_FB_RADEON is not set
++# CONFIG_FB_ATY128 is not set
++# CONFIG_FB_ATY is not set
++# CONFIG_FB_S3 is not set
++# CONFIG_FB_SAVAGE is not set
++# CONFIG_FB_SIS is not set
++# CONFIG_FB_NEOMAGIC is not set
++# CONFIG_FB_KYRO is not set
++# CONFIG_FB_3DFX is not set
++# CONFIG_FB_VOODOO1 is not set
++# CONFIG_FB_VT8623 is not set
++# CONFIG_FB_TRIDENT is not set
++# CONFIG_FB_ARK is not set
++# CONFIG_FB_PM3 is not set
++# CONFIG_FB_CARMINE is not set
++# CONFIG_FB_SMSCUFX is not set
++# CONFIG_FB_UDL is not set
++# CONFIG_FB_IBM_GXT4500 is not set
++# CONFIG_FB_VIRTUAL is not set
++# CONFIG_FB_METRONOME is not set
++# CONFIG_FB_MB862XX is not set
++# CONFIG_FB_SIMPLE is not set
++# CONFIG_FB_SM712 is not set
++# end of Frame buffer Devices
++
++#
++# Backlight & LCD device support
++#
++# CONFIG_LCD_CLASS_DEVICE is not set
++# CONFIG_BACKLIGHT_CLASS_DEVICE is not set
++# end of Backlight & LCD device support
++
++#
++# Console display driver support
++#
++CONFIG_VGA_CONSOLE=y
++# CONFIG_VGACON_SOFT_SCROLLBACK is not set
++CONFIG_DUMMY_CONSOLE=y
++CONFIG_DUMMY_CONSOLE_COLUMNS=80
++CONFIG_DUMMY_CONSOLE_ROWS=25
++CONFIG_FRAMEBUFFER_CONSOLE=y
++CONFIG_FRAMEBUFFER_CONSOLE_DETECT_PRIMARY=y
++# CONFIG_FRAMEBUFFER_CONSOLE_ROTATION is not set
++# CONFIG_FRAMEBUFFER_CONSOLE_DEFERRED_TAKEOVER is not set
++# end of Console display driver support
++
++# CONFIG_LOGO is not set
++# end of Graphics support
++
++# CONFIG_SOUND is not set
++
++#
++# HID support
++#
++CONFIG_HID=y
++# CONFIG_HID_BATTERY_STRENGTH is not set
++# CONFIG_HIDRAW is not set
++# CONFIG_UHID is not set
++CONFIG_HID_GENERIC=y
++
++#
++# Special HID drivers
++#
++# CONFIG_HID_A4TECH is not set
++# CONFIG_HID_ACCUTOUCH is not set
++# CONFIG_HID_ACRUX is not set
++# CONFIG_HID_APPLE is not set
++# CONFIG_HID_APPLEIR is not set
++# CONFIG_HID_AUREAL is not set
++# CONFIG_HID_BELKIN is not set
++# CONFIG_HID_BETOP_FF is not set
++# CONFIG_HID_CHERRY is not set
++# CONFIG_HID_CHICONY is not set
++# CONFIG_HID_COUGAR is not set
++# CONFIG_HID_MACALLY is not set
++# CONFIG_HID_CMEDIA is not set
++# CONFIG_HID_CREATIVE_SB0540 is not set
++# CONFIG_HID_CYPRESS is not set
++# CONFIG_HID_DRAGONRISE is not set
++# CONFIG_HID_EMS_FF is not set
++# CONFIG_HID_ELECOM is not set
++# CONFIG_HID_ELO is not set
++# CONFIG_HID_EZKEY is not set
++# CONFIG_HID_GEMBIRD is not set
++# CONFIG_HID_GFRM is not set
++# CONFIG_HID_GLORIOUS is not set
++# CONFIG_HID_HOLTEK is not set
++# CONFIG_HID_KEYTOUCH is not set
++# CONFIG_HID_KYE is not set
++# CONFIG_HID_UCLOGIC is not set
++# CONFIG_HID_WALTOP is not set
++# CONFIG_HID_VIEWSONIC is not set
++# CONFIG_HID_GYRATION is not set
++# CONFIG_HID_ICADE is not set
++# CONFIG_HID_ITE is not set
++# CONFIG_HID_JABRA is not set
++# CONFIG_HID_TWINHAN is not set
++# CONFIG_HID_KENSINGTON is not set
++# CONFIG_HID_LCPOWER is not set
++# CONFIG_HID_LENOVO is not set
++# CONFIG_HID_MAGICMOUSE is not set
++# CONFIG_HID_MALTRON is not set
++# CONFIG_HID_MAYFLASH is not set
++# CONFIG_HID_REDRAGON is not set
++# CONFIG_HID_MICROSOFT is not set
++# CONFIG_HID_MONTEREY is not set
++# CONFIG_HID_MULTITOUCH is not set
++# CONFIG_HID_NTI is not set
++# CONFIG_HID_NTRIG is not set
++# CONFIG_HID_ORTEK is not set
++# CONFIG_HID_PANTHERLORD is not set
++# CONFIG_HID_PENMOUNT is not set
++# CONFIG_HID_PETALYNX is not set
++# CONFIG_HID_PICOLCD is not set
++# CONFIG_HID_PLANTRONICS is not set
++# CONFIG_HID_PRIMAX is not set
++# CONFIG_HID_RETRODE is not set
++# CONFIG_HID_ROCCAT is not set
++# CONFIG_HID_SAITEK is not set
++# CONFIG_HID_SAMSUNG is not set
++# CONFIG_HID_SPEEDLINK is not set
++# CONFIG_HID_STEAM is not set
++# CONFIG_HID_STEELSERIES is not set
++# CONFIG_HID_SUNPLUS is not set
++# CONFIG_HID_RMI is not set
++# CONFIG_HID_GREENASIA is not set
++# CONFIG_HID_SMARTJOYPLUS is not set
++# CONFIG_HID_TIVO is not set
++# CONFIG_HID_TOPSEED is not set
++# CONFIG_HID_THRUSTMASTER is not set
++# CONFIG_HID_UDRAW_PS3 is not set
++# CONFIG_HID_WACOM is not set
++# CONFIG_HID_XINMO is not set
++# CONFIG_HID_ZEROPLUS is not set
++# CONFIG_HID_ZYDACRON is not set
++# CONFIG_HID_SENSOR_HUB is not set
++# CONFIG_HID_ALPS is not set
++# end of Special HID drivers
++
++#
++# USB HID support
++#
++CONFIG_USB_HID=y
++# CONFIG_HID_PID is not set
++# CONFIG_USB_HIDDEV is not set
++# end of USB HID support
++
++#
++# Intel ISH HID support
++#
++# CONFIG_INTEL_ISH_HID is not set
++# end of Intel ISH HID support
++# end of HID support
++
++CONFIG_USB_OHCI_LITTLE_ENDIAN=y
++CONFIG_USB_SUPPORT=y
++CONFIG_USB_COMMON=y
++# CONFIG_USB_ULPI_BUS is not set
++CONFIG_USB_ARCH_HAS_HCD=y
++CONFIG_USB=y
++CONFIG_USB_PCI=y
++# CONFIG_USB_ANNOUNCE_NEW_DEVICES is not set
++
++#
++# Miscellaneous USB options
++#
++# CONFIG_USB_DEFAULT_PERSIST is not set
++# CONFIG_USB_DYNAMIC_MINORS is not set
++# CONFIG_USB_OTG_WHITELIST is not set
++# CONFIG_USB_OTG_BLACKLIST_HUB is not set
++CONFIG_USB_AUTOSUSPEND_DELAY=2
++# CONFIG_USB_MON is not set
++
++#
++# USB Host Controller Drivers
++#
++# CONFIG_USB_C67X00_HCD is not set
++CONFIG_USB_XHCI_HCD=y
++# CONFIG_USB_XHCI_DBGCAP is not set
++CONFIG_USB_XHCI_PCI=y
++# CONFIG_USB_XHCI_PCI_RENESAS is not set
++# CONFIG_USB_XHCI_PLATFORM is not set
++# CONFIG_USB_EHCI_HCD is not set
++# CONFIG_USB_OXU210HP_HCD is not set
++# CONFIG_USB_ISP116X_HCD is not set
++# CONFIG_USB_FOTG210_HCD is not set
++# CONFIG_USB_OHCI_HCD is not set
++# CONFIG_USB_UHCI_HCD is not set
++# CONFIG_USB_SL811_HCD is not set
++# CONFIG_USB_R8A66597_HCD is not set
++# CONFIG_USB_HCD_TEST_MODE is not set
++
++#
++# USB Device Class drivers
++#
++# CONFIG_USB_ACM is not set
++# CONFIG_USB_PRINTER is not set
++# CONFIG_USB_WDM is not set
++# CONFIG_USB_TMC is not set
++
++#
++# NOTE: USB_STORAGE depends on SCSI but BLK_DEV_SD may
++#
++
++#
++# also be needed; see USB_STORAGE Help for more info
++#
++CONFIG_USB_STORAGE=y
++# CONFIG_USB_STORAGE_DEBUG is not set
++# CONFIG_USB_STORAGE_REALTEK is not set
++# CONFIG_USB_STORAGE_DATAFAB is not set
++# CONFIG_USB_STORAGE_FREECOM is not set
++# CONFIG_USB_STORAGE_ISD200 is not set
++# CONFIG_USB_STORAGE_USBAT is not set
++# CONFIG_USB_STORAGE_SDDR09 is not set
++# CONFIG_USB_STORAGE_SDDR55 is not set
++# CONFIG_USB_STORAGE_JUMPSHOT is not set
++# CONFIG_USB_STORAGE_ALAUDA is not set
++# CONFIG_USB_STORAGE_ONETOUCH is not set
++# CONFIG_USB_STORAGE_KARMA is not set
++# CONFIG_USB_STORAGE_CYPRESS_ATACB is not set
++# CONFIG_USB_STORAGE_ENE_UB6250 is not set
++# CONFIG_USB_UAS is not set
++
++#
++# USB Imaging devices
++#
++# CONFIG_USB_MDC800 is not set
++# CONFIG_USB_MICROTEK is not set
++# CONFIG_USB_CDNS3 is not set
++# CONFIG_USB_MUSB_HDRC is not set
++# CONFIG_USB_DWC3 is not set
++# CONFIG_USB_DWC2 is not set
++# CONFIG_USB_ISP1760 is not set
++
++#
++# USB port drivers
++#
++# CONFIG_USB_SERIAL is not set
++
++#
++# USB Miscellaneous drivers
++#
++# CONFIG_USB_EMI62 is not set
++# CONFIG_USB_EMI26 is not set
++# CONFIG_USB_ADUTUX is not set
++# CONFIG_USB_SEVSEG is not set
++# CONFIG_USB_LEGOTOWER is not set
++# CONFIG_USB_LCD is not set
++# CONFIG_USB_CYPRESS_CY7C63 is not set
++# CONFIG_USB_CYTHERM is not set
++# CONFIG_USB_IDMOUSE is not set
++# CONFIG_USB_FTDI_ELAN is not set
++# CONFIG_USB_APPLEDISPLAY is not set
++# CONFIG_APPLE_MFI_FASTCHARGE is not set
++# CONFIG_USB_LD is not set
++# CONFIG_USB_TRANCEVIBRATOR is not set
++# CONFIG_USB_IOWARRIOR is not set
++# CONFIG_USB_TEST is not set
++# CONFIG_USB_EHSET_TEST_FIXTURE is not set
++# CONFIG_USB_ISIGHTFW is not set
++# CONFIG_USB_YUREX is not set
++# CONFIG_USB_EZUSB_FX2 is not set
++# CONFIG_USB_LINK_LAYER_TEST is not set
++
++#
++# USB Physical Layer drivers
++#
++# CONFIG_NOP_USB_XCEIV is not set
++# end of USB Physical Layer drivers
++
++# CONFIG_USB_GADGET is not set
++# CONFIG_TYPEC is not set
++# CONFIG_USB_ROLE_SWITCH is not set
++CONFIG_MMC=y
++CONFIG_MMC_BLOCK=y
++CONFIG_MMC_BLOCK_MINORS=8
++# CONFIG_SDIO_UART is not set
++# CONFIG_MMC_TEST is not set
++
++#
++# MMC/SD/SDIO Host Controller Drivers
++#
++# CONFIG_MMC_DEBUG is not set
++CONFIG_MMC_SDHCI=y
++CONFIG_MMC_SDHCI_IO_ACCESSORS=y
++CONFIG_MMC_SDHCI_PCI=y
++CONFIG_MMC_RICOH_MMC=y
++# CONFIG_MMC_SDHCI_ACPI is not set
++# CONFIG_MMC_SDHCI_PLTFM is not set
++# CONFIG_MMC_WBSD is not set
++# CONFIG_MMC_TIFM_SD is not set
++# CONFIG_MMC_CB710 is not set
++# CONFIG_MMC_VIA_SDMMC is not set
++# CONFIG_MMC_VUB300 is not set
++# CONFIG_MMC_USHC is not set
++# CONFIG_MMC_USDHI6ROL0 is not set
++CONFIG_MMC_CQHCI=y
++# CONFIG_MMC_HSQ is not set
++# CONFIG_MMC_TOSHIBA_PCI is not set
++# CONFIG_MMC_MTK is not set
++# CONFIG_MEMSTICK is not set
++# CONFIG_NEW_LEDS is not set
++# CONFIG_ACCESSIBILITY is not set
++CONFIG_EDAC_ATOMIC_SCRUB=y
++CONFIG_EDAC_SUPPORT=y
++CONFIG_RTC_LIB=y
++CONFIG_RTC_MC146818_LIB=y
++# CONFIG_RTC_CLASS is not set
++CONFIG_DMADEVICES=y
++# CONFIG_DMADEVICES_DEBUG is not set
++
++#
++# DMA Devices
++#
++CONFIG_DMA_ENGINE=y
++CONFIG_DMA_VIRTUAL_CHANNELS=y
++CONFIG_DMA_ACPI=y
++# CONFIG_ALTERA_MSGDMA is not set
++CONFIG_INTEL_IDMA64=y
++# CONFIG_INTEL_IDXD is not set
++# CONFIG_INTEL_IOATDMA is not set
++# CONFIG_PLX_DMA is not set
++# CONFIG_QCOM_HIDMA_MGMT is not set
++# CONFIG_QCOM_HIDMA is not set
++CONFIG_DW_DMAC_CORE=y
++# CONFIG_DW_DMAC is not set
++CONFIG_DW_DMAC_PCI=y
++# CONFIG_DW_EDMA is not set
++# CONFIG_DW_EDMA_PCIE is not set
++CONFIG_HSU_DMA=y
++# CONFIG_SF_PDMA is not set
++
++#
++# DMA Clients
++#
++# CONFIG_ASYNC_TX_DMA is not set
++# CONFIG_DMATEST is not set
++
++#
++# DMABUF options
++#
++# CONFIG_SYNC_FILE is not set
++# CONFIG_DMABUF_MOVE_NOTIFY is not set
++# CONFIG_DMABUF_HEAPS is not set
++# end of DMABUF options
++
++# CONFIG_AUXDISPLAY is not set
++# CONFIG_UIO is not set
++# CONFIG_VIRT_DRIVERS is not set
++# CONFIG_VIRTIO_MENU is not set
++# CONFIG_VDPA is not set
++CONFIG_VHOST_MENU=y
++# CONFIG_VHOST_CROSS_ENDIAN_LEGACY is not set
++
++#
++# Microsoft Hyper-V guest support
++#
++# end of Microsoft Hyper-V guest support
++
++# CONFIG_GREYBUS is not set
++# CONFIG_STAGING is not set
++CONFIG_X86_PLATFORM_DEVICES=y
++CONFIG_ACPI_WMI=y
++CONFIG_WMI_BMOF=y
++# CONFIG_INTEL_WMI_SBL_FW_UPDATE is not set
++# CONFIG_INTEL_WMI_THUNDERBOLT is not set
++# CONFIG_MXM_WMI is not set
++# CONFIG_PEAQ_WMI is not set
++# CONFIG_XIAOMI_WMI is not set
++# CONFIG_ACERHDF is not set
++# CONFIG_ACER_WIRELESS is not set
++# CONFIG_ASUS_WIRELESS is not set
++# CONFIG_DCDBAS is not set
++# CONFIG_DELL_SMBIOS is not set
++# CONFIG_DELL_RBU is not set
++# CONFIG_DELL_SMO8800 is not set
++# CONFIG_DELL_WMI_AIO is not set
++# CONFIG_FUJITSU_TABLET is not set
++# CONFIG_GPD_POCKET_FAN is not set
++# CONFIG_HP_WIRELESS is not set
++# CONFIG_HP_WMI is not set
++# CONFIG_IBM_RTL is not set
++# CONFIG_SENSORS_HDAPS is not set
++# CONFIG_INTEL_HID_EVENT is not set
++# CONFIG_INTEL_MENLOW is not set
++# CONFIG_INTEL_VBTN is not set
++# CONFIG_SURFACE_PRO3_BUTTON is not set
++# CONFIG_SAMSUNG_Q10 is not set
++# CONFIG_TOSHIBA_BT_RFKILL is not set
++# CONFIG_TOSHIBA_HAPS is not set
++# CONFIG_TOSHIBA_WMI is not set
++# CONFIG_ACPI_CMPC is not set
++# CONFIG_LG_LAPTOP is not set
++# CONFIG_SYSTEM76_ACPI is not set
++# CONFIG_TOPSTAR_LAPTOP is not set
++# CONFIG_INTEL_IPS is not set
++# CONFIG_INTEL_RST is not set
++# CONFIG_INTEL_SMARTCONNECT is not set
++
++#
++# Intel Speed Select Technology interface support
++#
++# CONFIG_INTEL_SPEED_SELECT_INTERFACE is not set
++# end of Intel Speed Select Technology interface support
++
++# CONFIG_INTEL_TURBO_MAX_3 is not set
++# CONFIG_INTEL_UNCORE_FREQ_CONTROL is not set
++# CONFIG_INTEL_PMC_CORE is not set
++# CONFIG_INTEL_PUNIT_IPC is not set
++# CONFIG_INTEL_SCU_PCI is not set
++# CONFIG_INTEL_SCU_PLATFORM is not set
++CONFIG_PMC_ATOM=y
++# CONFIG_MFD_CROS_EC is not set
++# CONFIG_CHROME_PLATFORMS is not set
++# CONFIG_MELLANOX_PLATFORM is not set
++CONFIG_HAVE_CLK=y
++CONFIG_CLKDEV_LOOKUP=y
++CONFIG_HAVE_CLK_PREPARE=y
++CONFIG_COMMON_CLK=y
++# CONFIG_HWSPINLOCK is not set
++
++#
++# Clock Source drivers
++#
++CONFIG_CLKEVT_I8253=y
++CONFIG_CLKBLD_I8253=y
++# end of Clock Source drivers
++
++CONFIG_MAILBOX=y
++CONFIG_PCC=y
++# CONFIG_ALTERA_MBOX is not set
++# CONFIG_IOMMU_SUPPORT is not set
++
++#
++# Remoteproc drivers
++#
++# CONFIG_REMOTEPROC is not set
++# end of Remoteproc drivers
++
++#
++# Rpmsg drivers
++#
++# CONFIG_RPMSG_QCOM_GLINK_RPM is not set
++# CONFIG_RPMSG_VIRTIO is not set
++# end of Rpmsg drivers
++
++# CONFIG_SOUNDWIRE is not set
++
++#
++# SOC (System On Chip) specific Drivers
++#
++
++#
++# Amlogic SoC drivers
++#
++# end of Amlogic SoC drivers
++
++#
++# Aspeed SoC drivers
++#
++# end of Aspeed SoC drivers
++
++#
++# Broadcom SoC drivers
++#
++# end of Broadcom SoC drivers
++
++#
++# NXP/Freescale QorIQ SoC drivers
++#
++# end of NXP/Freescale QorIQ SoC drivers
++
++#
++# i.MX SoC drivers
++#
++# end of i.MX SoC drivers
++
++#
++# Qualcomm SoC drivers
++#
++# end of Qualcomm SoC drivers
++
++# CONFIG_SOC_TI is not set
++
++#
++# Xilinx SoC drivers
++#
++# CONFIG_XILINX_VCU is not set
++# end of Xilinx SoC drivers
++# end of SOC (System On Chip) specific Drivers
++
++# CONFIG_PM_DEVFREQ is not set
++# CONFIG_EXTCON is not set
++# CONFIG_MEMORY is not set
++# CONFIG_IIO is not set
++# CONFIG_NTB is not set
++# CONFIG_VME_BUS is not set
++# CONFIG_PWM is not set
++
++#
++# IRQ chip support
++#
++# end of IRQ chip support
++
++# CONFIG_IPACK_BUS is not set
++# CONFIG_RESET_CONTROLLER is not set
++
++#
++# PHY Subsystem
++#
++# CONFIG_GENERIC_PHY is not set
++# CONFIG_BCM_KONA_USB2_PHY is not set
++# CONFIG_PHY_PXA_28NM_HSIC is not set
++# CONFIG_PHY_PXA_28NM_USB2 is not set
++# CONFIG_PHY_INTEL_EMMC is not set
++# end of PHY Subsystem
++
++# CONFIG_POWERCAP is not set
++# CONFIG_MCB is not set
++
++#
++# Performance monitor support
++#
++# end of Performance monitor support
++
++# CONFIG_RAS is not set
++# CONFIG_USB4 is not set
++
++#
++# Android
++#
++# CONFIG_ANDROID is not set
++# end of Android
++
++# CONFIG_LIBNVDIMM is not set
++# CONFIG_DAX is not set
++# CONFIG_NVMEM is not set
++
++#
++# HW tracing support
++#
++# CONFIG_STM is not set
++# CONFIG_INTEL_TH is not set
++# end of HW tracing support
++
++# CONFIG_FPGA is not set
++# CONFIG_TEE is not set
++# CONFIG_UNISYS_VISORBUS is not set
++# CONFIG_SIOX is not set
++# CONFIG_SLIMBUS is not set
++# CONFIG_INTERCONNECT is not set
++# CONFIG_COUNTER is not set
++# end of Device Drivers
++
++#
++# File systems
++#
++CONFIG_DCACHE_WORD_ACCESS=y
++# CONFIG_VALIDATE_FS_PARSER is not set
++CONFIG_FS_IOMAP=y
++# CONFIG_EXT2_FS is not set
++# CONFIG_EXT3_FS is not set
++CONFIG_EXT4_FS=y
++CONFIG_EXT4_USE_FOR_EXT2=y
++# CONFIG_EXT4_FS_POSIX_ACL is not set
++# CONFIG_EXT4_FS_SECURITY is not set
++# CONFIG_EXT4_DEBUG is not set
++CONFIG_JBD2=y
++# CONFIG_JBD2_DEBUG is not set
++CONFIG_FS_MBCACHE=y
++# CONFIG_REISERFS_FS is not set
++# CONFIG_JFS_FS is not set
++# CONFIG_XFS_FS is not set
++# CONFIG_GFS2_FS is not set
++# CONFIG_BTRFS_FS is not set
++# CONFIG_NILFS2_FS is not set
++# CONFIG_F2FS_FS is not set
++# CONFIG_FS_DAX is not set
++# CONFIG_EXPORTFS_BLOCK_OPS is not set
++# CONFIG_FILE_LOCKING is not set
++# CONFIG_FS_ENCRYPTION is not set
++# CONFIG_FS_VERITY is not set
++# CONFIG_DNOTIFY is not set
++# CONFIG_INOTIFY_USER is not set
++# CONFIG_FANOTIFY is not set
++# CONFIG_QUOTA is not set
++# CONFIG_AUTOFS4_FS is not set
++# CONFIG_AUTOFS_FS is not set
++# CONFIG_FUSE_FS is not set
++# CONFIG_OVERLAY_FS is not set
++
++#
++# Caches
++#
++# CONFIG_FSCACHE is not set
++# end of Caches
++
++#
++# CD-ROM/DVD Filesystems
++#
++# CONFIG_ISO9660_FS is not set
++# CONFIG_UDF_FS is not set
++# end of CD-ROM/DVD Filesystems
++
++#
++# DOS/FAT/EXFAT/NT Filesystems
++#
++CONFIG_FAT_FS=y
++# CONFIG_MSDOS_FS is not set
++CONFIG_VFAT_FS=y
++CONFIG_FAT_DEFAULT_CODEPAGE=437
++CONFIG_FAT_DEFAULT_IOCHARSET="iso8859-1"
++# CONFIG_FAT_DEFAULT_UTF8 is not set
++# CONFIG_EXFAT_FS is not set
++# CONFIG_NTFS_FS is not set
++# end of DOS/FAT/EXFAT/NT Filesystems
++
++#
++# Pseudo filesystems
++#
++CONFIG_PROC_FS=y
++# CONFIG_PROC_KCORE is not set
++CONFIG_PROC_SYSCTL=y
++CONFIG_PROC_PAGE_MONITOR=y
++# CONFIG_PROC_CHILDREN is not set
++CONFIG_PROC_PID_ARCH_STATUS=y
++CONFIG_KERNFS=y
++CONFIG_SYSFS=y
++# CONFIG_HUGETLBFS is not set
++CONFIG_ARCH_HAS_GIGANTIC_PAGE=y
++# CONFIG_CONFIGFS_FS is not set
++CONFIG_EFIVAR_FS=y
++# end of Pseudo filesystems
++
++# CONFIG_MISC_FILESYSTEMS is not set
++CONFIG_NLS=y
++CONFIG_NLS_DEFAULT="iso8859-1"
++CONFIG_NLS_CODEPAGE_437=y
++# CONFIG_NLS_CODEPAGE_737 is not set
++# CONFIG_NLS_CODEPAGE_775 is not set
++# CONFIG_NLS_CODEPAGE_850 is not set
++# CONFIG_NLS_CODEPAGE_852 is not set
++# CONFIG_NLS_CODEPAGE_855 is not set
++# CONFIG_NLS_CODEPAGE_857 is not set
++# CONFIG_NLS_CODEPAGE_860 is not set
++# CONFIG_NLS_CODEPAGE_861 is not set
++# CONFIG_NLS_CODEPAGE_862 is not set
++# CONFIG_NLS_CODEPAGE_863 is not set
++# CONFIG_NLS_CODEPAGE_864 is not set
++# CONFIG_NLS_CODEPAGE_865 is not set
++# CONFIG_NLS_CODEPAGE_866 is not set
++# CONFIG_NLS_CODEPAGE_869 is not set
++# CONFIG_NLS_CODEPAGE_936 is not set
++# CONFIG_NLS_CODEPAGE_950 is not set
++# CONFIG_NLS_CODEPAGE_932 is not set
++# CONFIG_NLS_CODEPAGE_949 is not set
++# CONFIG_NLS_CODEPAGE_874 is not set
++# CONFIG_NLS_ISO8859_8 is not set
++# CONFIG_NLS_CODEPAGE_1250 is not set
++# CONFIG_NLS_CODEPAGE_1251 is not set
++CONFIG_NLS_ASCII=y
++CONFIG_NLS_ISO8859_1=y
++# CONFIG_NLS_ISO8859_2 is not set
++# CONFIG_NLS_ISO8859_3 is not set
++# CONFIG_NLS_ISO8859_4 is not set
++# CONFIG_NLS_ISO8859_5 is not set
++# CONFIG_NLS_ISO8859_6 is not set
++# CONFIG_NLS_ISO8859_7 is not set
++# CONFIG_NLS_ISO8859_9 is not set
++# CONFIG_NLS_ISO8859_13 is not set
++# CONFIG_NLS_ISO8859_14 is not set
++# CONFIG_NLS_ISO8859_15 is not set
++# CONFIG_NLS_KOI8_R is not set
++# CONFIG_NLS_KOI8_U is not set
++# CONFIG_NLS_MAC_ROMAN is not set
++# CONFIG_NLS_MAC_CELTIC is not set
++# CONFIG_NLS_MAC_CENTEURO is not set
++# CONFIG_NLS_MAC_CROATIAN is not set
++# CONFIG_NLS_MAC_CYRILLIC is not set
++# CONFIG_NLS_MAC_GAELIC is not set
++# CONFIG_NLS_MAC_GREEK is not set
++# CONFIG_NLS_MAC_ICELAND is not set
++# CONFIG_NLS_MAC_INUIT is not set
++# CONFIG_NLS_MAC_ROMANIAN is not set
++# CONFIG_NLS_MAC_TURKISH is not set
++# CONFIG_NLS_UTF8 is not set
++# CONFIG_UNICODE is not set
++CONFIG_IO_WQ=y
++# end of File systems
++
++#
++# Security options
++#
++# CONFIG_KEYS is not set
++# CONFIG_SECURITY_DMESG_RESTRICT is not set
++# CONFIG_SECURITYFS is not set
++CONFIG_PAGE_TABLE_ISOLATION=y
++# CONFIG_FORTIFY_SOURCE is not set
++# CONFIG_STATIC_USERMODEHELPER is not set
++# CONFIG_IMA_SECURE_AND_OR_TRUSTED_BOOT is not set
++CONFIG_DEFAULT_SECURITY_DAC=y
++CONFIG_LSM="lockdown,yama,loadpin,safesetid,integrity"
++
++#
++# Kernel hardening options
++#
++
++#
++# Memory initialization
++#
++CONFIG_INIT_STACK_NONE=y
++# CONFIG_INIT_ON_ALLOC_DEFAULT_ON is not set
++# CONFIG_INIT_ON_FREE_DEFAULT_ON is not set
++# end of Memory initialization
++# end of Kernel hardening options
++# end of Security options
++
++CONFIG_CRYPTO=y
++
++#
++# Crypto core or helper
++#
++CONFIG_CRYPTO_ALGAPI=y
++CONFIG_CRYPTO_ALGAPI2=y
++CONFIG_CRYPTO_AEAD=y
++CONFIG_CRYPTO_AEAD2=y
++CONFIG_CRYPTO_SKCIPHER2=y
++CONFIG_CRYPTO_HASH=y
++CONFIG_CRYPTO_HASH2=y
++CONFIG_CRYPTO_RNG=y
++CONFIG_CRYPTO_RNG2=y
++CONFIG_CRYPTO_RNG_DEFAULT=y
++CONFIG_CRYPTO_AKCIPHER2=y
++CONFIG_CRYPTO_KPP2=y
++CONFIG_CRYPTO_ACOMP2=y
++CONFIG_CRYPTO_MANAGER=y
++CONFIG_CRYPTO_MANAGER2=y
++CONFIG_CRYPTO_MANAGER_DISABLE_TESTS=y
++CONFIG_CRYPTO_NULL=y
++CONFIG_CRYPTO_NULL2=y
++# CONFIG_CRYPTO_PCRYPT is not set
++# CONFIG_CRYPTO_CRYPTD is not set
++# CONFIG_CRYPTO_AUTHENC is not set
++
++#
++# Public-key cryptography
++#
++# CONFIG_CRYPTO_RSA is not set
++# CONFIG_CRYPTO_DH is not set
++# CONFIG_CRYPTO_ECDH is not set
++# CONFIG_CRYPTO_ECRDSA is not set
++# CONFIG_CRYPTO_CURVE25519 is not set
++# CONFIG_CRYPTO_CURVE25519_X86 is not set
++
++#
++# Authenticated Encryption with Associated Data
++#
++# CONFIG_CRYPTO_CCM is not set
++# CONFIG_CRYPTO_GCM is not set
++# CONFIG_CRYPTO_CHACHA20POLY1305 is not set
++# CONFIG_CRYPTO_AEGIS128 is not set
++# CONFIG_CRYPTO_AEGIS128_AESNI_SSE2 is not set
++# CONFIG_CRYPTO_SEQIV is not set
++CONFIG_CRYPTO_ECHAINIV=y
++
++#
++# Block modes
++#
++# CONFIG_CRYPTO_CBC is not set
++# CONFIG_CRYPTO_CFB is not set
++# CONFIG_CRYPTO_CTR is not set
++# CONFIG_CRYPTO_CTS is not set
++# CONFIG_CRYPTO_ECB is not set
++# CONFIG_CRYPTO_LRW is not set
++# CONFIG_CRYPTO_OFB is not set
++# CONFIG_CRYPTO_PCBC is not set
++# CONFIG_CRYPTO_XTS is not set
++# CONFIG_CRYPTO_KEYWRAP is not set
++# CONFIG_CRYPTO_NHPOLY1305_SSE2 is not set
++# CONFIG_CRYPTO_NHPOLY1305_AVX2 is not set
++# CONFIG_CRYPTO_ADIANTUM is not set
++# CONFIG_CRYPTO_ESSIV is not set
++
++#
++# Hash modes
++#
++# CONFIG_CRYPTO_CMAC is not set
++CONFIG_CRYPTO_HMAC=y
++# CONFIG_CRYPTO_XCBC is not set
++# CONFIG_CRYPTO_VMAC is not set
++
++#
++# Digest
++#
++CONFIG_CRYPTO_CRC32C=y
++# CONFIG_CRYPTO_CRC32C_INTEL is not set
++# CONFIG_CRYPTO_CRC32 is not set
++# CONFIG_CRYPTO_CRC32_PCLMUL is not set
++# CONFIG_CRYPTO_XXHASH is not set
++# CONFIG_CRYPTO_BLAKE2B is not set
++# CONFIG_CRYPTO_BLAKE2S is not set
++# CONFIG_CRYPTO_BLAKE2S_X86 is not set
++# CONFIG_CRYPTO_CRCT10DIF is not set
++# CONFIG_CRYPTO_GHASH is not set
++# CONFIG_CRYPTO_POLY1305 is not set
++# CONFIG_CRYPTO_POLY1305_X86_64 is not set
++# CONFIG_CRYPTO_MD4 is not set
++# CONFIG_CRYPTO_MD5 is not set
++# CONFIG_CRYPTO_MICHAEL_MIC is not set
++# CONFIG_CRYPTO_RMD128 is not set
++# CONFIG_CRYPTO_RMD160 is not set
++# CONFIG_CRYPTO_RMD256 is not set
++# CONFIG_CRYPTO_RMD320 is not set
++# CONFIG_CRYPTO_SHA1 is not set
++# CONFIG_CRYPTO_SHA1_SSSE3 is not set
++# CONFIG_CRYPTO_SHA256_SSSE3 is not set
++# CONFIG_CRYPTO_SHA512_SSSE3 is not set
++CONFIG_CRYPTO_SHA256=y
++# CONFIG_CRYPTO_SHA512 is not set
++# CONFIG_CRYPTO_SHA3 is not set
++# CONFIG_CRYPTO_SM3 is not set
++# CONFIG_CRYPTO_STREEBOG is not set
++# CONFIG_CRYPTO_TGR192 is not set
++# CONFIG_CRYPTO_WP512 is not set
++# CONFIG_CRYPTO_GHASH_CLMUL_NI_INTEL is not set
++
++#
++# Ciphers
++#
++# CONFIG_CRYPTO_AES is not set
++# CONFIG_CRYPTO_AES_TI is not set
++# CONFIG_CRYPTO_AES_NI_INTEL is not set
++# CONFIG_CRYPTO_ANUBIS is not set
++# CONFIG_CRYPTO_ARC4 is not set
++# CONFIG_CRYPTO_BLOWFISH is not set
++# CONFIG_CRYPTO_BLOWFISH_X86_64 is not set
++# CONFIG_CRYPTO_CAMELLIA is not set
++# CONFIG_CRYPTO_CAMELLIA_X86_64 is not set
++# CONFIG_CRYPTO_CAMELLIA_AESNI_AVX_X86_64 is not set
++# CONFIG_CRYPTO_CAMELLIA_AESNI_AVX2_X86_64 is not set
++# CONFIG_CRYPTO_CAST5 is not set
++# CONFIG_CRYPTO_CAST5_AVX_X86_64 is not set
++# CONFIG_CRYPTO_CAST6 is not set
++# CONFIG_CRYPTO_CAST6_AVX_X86_64 is not set
++# CONFIG_CRYPTO_DES is not set
++# CONFIG_CRYPTO_DES3_EDE_X86_64 is not set
++# CONFIG_CRYPTO_FCRYPT is not set
++# CONFIG_CRYPTO_KHAZAD is not set
++# CONFIG_CRYPTO_SALSA20 is not set
++# CONFIG_CRYPTO_CHACHA20 is not set
++# CONFIG_CRYPTO_CHACHA20_X86_64 is not set
++# CONFIG_CRYPTO_SEED is not set
++# CONFIG_CRYPTO_SERPENT is not set
++# CONFIG_CRYPTO_SERPENT_SSE2_X86_64 is not set
++# CONFIG_CRYPTO_SERPENT_AVX_X86_64 is not set
++# CONFIG_CRYPTO_SERPENT_AVX2_X86_64 is not set
++# CONFIG_CRYPTO_SM4 is not set
++# CONFIG_CRYPTO_TEA is not set
++# CONFIG_CRYPTO_TWOFISH is not set
++# CONFIG_CRYPTO_TWOFISH_X86_64 is not set
++# CONFIG_CRYPTO_TWOFISH_X86_64_3WAY is not set
++# CONFIG_CRYPTO_TWOFISH_AVX_X86_64 is not set
++
++#
++# Compression
++#
++# CONFIG_CRYPTO_DEFLATE is not set
++# CONFIG_CRYPTO_LZO is not set
++# CONFIG_CRYPTO_842 is not set
++# CONFIG_CRYPTO_LZ4 is not set
++# CONFIG_CRYPTO_LZ4HC is not set
++# CONFIG_CRYPTO_ZSTD is not set
++
++#
++# Random Number Generation
++#
++# CONFIG_CRYPTO_ANSI_CPRNG is not set
++CONFIG_CRYPTO_DRBG_MENU=y
++CONFIG_CRYPTO_DRBG_HMAC=y
++# CONFIG_CRYPTO_DRBG_HASH is not set
++# CONFIG_CRYPTO_DRBG_CTR is not set
++CONFIG_CRYPTO_DRBG=y
++CONFIG_CRYPTO_JITTERENTROPY=y
++
++#
++# Crypto library routines
++#
++# CONFIG_CRYPTO_LIB_BLAKE2S is not set
++# CONFIG_CRYPTO_LIB_CHACHA is not set
++# CONFIG_CRYPTO_LIB_CURVE25519 is not set
++CONFIG_CRYPTO_LIB_POLY1305_RSIZE=11
++# CONFIG_CRYPTO_LIB_POLY1305 is not set
++# CONFIG_CRYPTO_LIB_CHACHA20POLY1305 is not set
++CONFIG_CRYPTO_LIB_SHA256=y
++CONFIG_CRYPTO_HW=y
++# CONFIG_CRYPTO_DEV_PADLOCK is not set
++# CONFIG_CRYPTO_DEV_CCP is not set
++# CONFIG_CRYPTO_DEV_QAT_DH895xCC is not set
++# CONFIG_CRYPTO_DEV_QAT_C3XXX is not set
++# CONFIG_CRYPTO_DEV_QAT_C62X is not set
++# CONFIG_CRYPTO_DEV_QAT_DH895xCCVF is not set
++# CONFIG_CRYPTO_DEV_QAT_C3XXXVF is not set
++# CONFIG_CRYPTO_DEV_QAT_C62XVF is not set
++# CONFIG_CRYPTO_DEV_NITROX_CNN55XX is not set
++# CONFIG_CRYPTO_DEV_SAFEXCEL is not set
++# CONFIG_CRYPTO_DEV_AMLOGIC_GXL is not set
++
++#
++# Certificates for signature checking
++#
++# end of Certificates for signature checking
++
++#
++# Library routines
++#
++# CONFIG_PACKING is not set
++CONFIG_BITREVERSE=y
++CONFIG_GENERIC_STRNCPY_FROM_USER=y
++CONFIG_GENERIC_STRNLEN_USER=y
++CONFIG_GENERIC_FIND_FIRST_BIT=y
++# CONFIG_CORDIC is not set
++# CONFIG_PRIME_NUMBERS is not set
++CONFIG_RATIONAL=y
++CONFIG_GENERIC_PCI_IOMAP=y
++CONFIG_GENERIC_IOMAP=y
++CONFIG_ARCH_USE_CMPXCHG_LOCKREF=y
++CONFIG_ARCH_HAS_FAST_MULTIPLIER=y
++CONFIG_ARCH_USE_SYM_ANNOTATIONS=y
++# CONFIG_CRC_CCITT is not set
++CONFIG_CRC16=y
++# CONFIG_CRC_T10DIF is not set
++# CONFIG_CRC_ITU_T is not set
++CONFIG_CRC32=y
++# CONFIG_CRC32_SELFTEST is not set
++CONFIG_CRC32_SLICEBY8=y
++# CONFIG_CRC32_SLICEBY4 is not set
++# CONFIG_CRC32_SARWATE is not set
++# CONFIG_CRC32_BIT is not set
++# CONFIG_CRC64 is not set
++# CONFIG_CRC4 is not set
++# CONFIG_CRC7 is not set
++# CONFIG_LIBCRC32C is not set
++# CONFIG_CRC8 is not set
++# CONFIG_RANDOM32_SELFTEST is not set
++CONFIG_ZLIB_INFLATE=y
++CONFIG_XZ_DEC=y
++CONFIG_XZ_DEC_X86=y
++CONFIG_XZ_DEC_POWERPC=y
++CONFIG_XZ_DEC_IA64=y
++CONFIG_XZ_DEC_ARM=y
++CONFIG_XZ_DEC_ARMTHUMB=y
++CONFIG_XZ_DEC_SPARC=y
++CONFIG_XZ_DEC_BCJ=y
++# CONFIG_XZ_DEC_TEST is not set
++CONFIG_DECOMPRESS_GZIP=y
++CONFIG_DECOMPRESS_XZ=y
++CONFIG_GENERIC_ALLOCATOR=y
++CONFIG_HAS_IOMEM=y
++CONFIG_HAS_IOPORT_MAP=y
++CONFIG_HAS_DMA=y
++CONFIG_NEED_SG_DMA_LENGTH=y
++CONFIG_NEED_DMA_MAP_STATE=y
++CONFIG_ARCH_DMA_ADDR_T_64BIT=y
++CONFIG_SWIOTLB=y
++# CONFIG_DMA_API_DEBUG is not set
++CONFIG_SGL_ALLOC=y
++CONFIG_GLOB=y
++# CONFIG_GLOB_SELFTEST is not set
++# CONFIG_IRQ_POLL is not set
++CONFIG_UCS2_STRING=y
++CONFIG_HAVE_GENERIC_VDSO=y
++CONFIG_GENERIC_GETTIMEOFDAY=y
++CONFIG_GENERIC_VDSO_TIME_NS=y
++CONFIG_FONT_SUPPORT=y
++# CONFIG_FONTS is not set
++CONFIG_FONT_8x8=y
++CONFIG_FONT_8x16=y
++CONFIG_SG_POOL=y
++CONFIG_ARCH_HAS_PMEM_API=y
++CONFIG_ARCH_HAS_UACCESS_FLUSHCACHE=y
++CONFIG_ARCH_HAS_UACCESS_MCSAFE=y
++CONFIG_ARCH_STACKWALK=y
++CONFIG_SBITMAP=y
++# CONFIG_STRING_SELFTEST is not set
++# end of Library routines
++
++#
++# Kernel hacking
++#
++
++#
++# printk and dmesg options
++#
++# CONFIG_PRINTK_TIME is not set
++# CONFIG_PRINTK_CALLER is not set
++CONFIG_CONSOLE_LOGLEVEL_DEFAULT=7
++CONFIG_CONSOLE_LOGLEVEL_QUIET=4
++CONFIG_MESSAGE_LOGLEVEL_DEFAULT=4
++# CONFIG_BOOT_PRINTK_DELAY is not set
++# CONFIG_DYNAMIC_DEBUG is not set
++# CONFIG_DYNAMIC_DEBUG_CORE is not set
++CONFIG_SYMBOLIC_ERRNAME=y
++# end of printk and dmesg options
++
++#
++# Compile-time checks and compiler options
++#
++# CONFIG_DEBUG_INFO is not set
++# CONFIG_ENABLE_MUST_CHECK is not set
++CONFIG_FRAME_WARN=1024
++# CONFIG_STRIP_ASM_SYMS is not set
++# CONFIG_READABLE_ASM is not set
++# CONFIG_HEADERS_INSTALL is not set
++# CONFIG_DEBUG_SECTION_MISMATCH is not set
++# CONFIG_SECTION_MISMATCH_WARN_ONLY is not set
++CONFIG_STACK_VALIDATION=y
++# CONFIG_DEBUG_FORCE_WEAK_PER_CPU is not set
++# end of Compile-time checks and compiler options
++
++#
++# Generic Kernel Debugging Instruments
++#
++# CONFIG_MAGIC_SYSRQ is not set
++CONFIG_DEBUG_FS=y
++CONFIG_HAVE_ARCH_KGDB=y
++# CONFIG_KGDB is not set
++CONFIG_ARCH_HAS_UBSAN_SANITIZE_ALL=y
++# CONFIG_UBSAN is not set
++# end of Generic Kernel Debugging Instruments
++
++CONFIG_DEBUG_KERNEL=y
++CONFIG_DEBUG_MISC=y
++
++#
++# Memory Debugging
++#
++# CONFIG_PAGE_EXTENSION is not set
++# CONFIG_DEBUG_PAGEALLOC is not set
++# CONFIG_PAGE_OWNER is not set
++# CONFIG_PAGE_POISONING is not set
++# CONFIG_DEBUG_RODATA_TEST is not set
++CONFIG_ARCH_HAS_DEBUG_WX=y
++# CONFIG_DEBUG_WX is not set
++CONFIG_GENERIC_PTDUMP=y
++# CONFIG_PTDUMP_DEBUGFS is not set
++# CONFIG_DEBUG_OBJECTS is not set
++CONFIG_HAVE_DEBUG_KMEMLEAK=y
++# CONFIG_DEBUG_KMEMLEAK is not set
++# CONFIG_DEBUG_STACK_USAGE is not set
++# CONFIG_SCHED_STACK_END_CHECK is not set
++CONFIG_ARCH_HAS_DEBUG_VM_PGTABLE=y
++# CONFIG_DEBUG_VM is not set
++# CONFIG_DEBUG_VM_PGTABLE is not set
++CONFIG_ARCH_HAS_DEBUG_VIRTUAL=y
++# CONFIG_DEBUG_VIRTUAL is not set
++# CONFIG_DEBUG_MEMORY_INIT is not set
++# CONFIG_DEBUG_PER_CPU_MAPS is not set
++CONFIG_HAVE_ARCH_KASAN=y
++CONFIG_HAVE_ARCH_KASAN_VMALLOC=y
++CONFIG_CC_HAS_KASAN_GENERIC=y
++CONFIG_KASAN_STACK=1
++# end of Memory Debugging
++
++# CONFIG_DEBUG_SHIRQ is not set
++
++#
++# Debug Oops, Lockups and Hangs
++#
++# CONFIG_PANIC_ON_OOPS is not set
++CONFIG_PANIC_ON_OOPS_VALUE=0
++CONFIG_PANIC_TIMEOUT=0
++# CONFIG_SOFTLOCKUP_DETECTOR is not set
++CONFIG_HARDLOCKUP_CHECK_TIMESTAMP=y
++# CONFIG_HARDLOCKUP_DETECTOR is not set
++# CONFIG_DETECT_HUNG_TASK is not set
++# CONFIG_WQ_WATCHDOG is not set
++# CONFIG_TEST_LOCKUP is not set
++# end of Debug Oops, Lockups and Hangs
++
++#
++# Scheduler Debugging
++#
++CONFIG_SCHED_DEBUG=y
++# CONFIG_SCHEDSTATS is not set
++# end of Scheduler Debugging
++
++# CONFIG_DEBUG_TIMEKEEPING is not set
++
++#
++# Lock Debugging (spinlocks, mutexes, etc...)
++#
++CONFIG_LOCK_DEBUGGING_SUPPORT=y
++# CONFIG_PROVE_LOCKING is not set
++# CONFIG_LOCK_STAT is not set
++# CONFIG_DEBUG_SPINLOCK is not set
++# CONFIG_DEBUG_MUTEXES is not set
++# CONFIG_DEBUG_WW_MUTEX_SLOWPATH is not set
++# CONFIG_DEBUG_RWSEMS is not set
++# CONFIG_DEBUG_LOCK_ALLOC is not set
++# CONFIG_DEBUG_ATOMIC_SLEEP is not set
++# CONFIG_DEBUG_LOCKING_API_SELFTESTS is not set
++# CONFIG_LOCK_TORTURE_TEST is not set
++# CONFIG_WW_MUTEX_SELFTEST is not set
++# end of Lock Debugging (spinlocks, mutexes, etc...)
++
++# CONFIG_STACKTRACE is not set
++# CONFIG_WARN_ALL_UNSEEDED_RANDOM is not set
++# CONFIG_DEBUG_KOBJECT is not set
++
++#
++# Debug kernel data structures
++#
++# CONFIG_DEBUG_LIST is not set
++# CONFIG_DEBUG_PLIST is not set
++# CONFIG_DEBUG_SG is not set
++# CONFIG_DEBUG_NOTIFIERS is not set
++# CONFIG_BUG_ON_DATA_CORRUPTION is not set
++# end of Debug kernel data structures
++
++# CONFIG_DEBUG_CREDENTIALS is not set
++
++#
++# RCU Debugging
++#
++# CONFIG_RCU_PERF_TEST is not set
++# CONFIG_RCU_TORTURE_TEST is not set
++CONFIG_RCU_CPU_STALL_TIMEOUT=21
++# CONFIG_RCU_TRACE is not set
++# CONFIG_RCU_EQS_DEBUG is not set
++# end of RCU Debugging
++
++# CONFIG_DEBUG_WQ_FORCE_RR_CPU is not set
++# CONFIG_DEBUG_BLOCK_EXT_DEVT is not set
++# CONFIG_CPU_HOTPLUG_STATE_CONTROL is not set
++# CONFIG_LATENCYTOP is not set
++CONFIG_USER_STACKTRACE_SUPPORT=y
++CONFIG_HAVE_FUNCTION_TRACER=y
++CONFIG_HAVE_FUNCTION_GRAPH_TRACER=y
++CONFIG_HAVE_DYNAMIC_FTRACE=y
++CONFIG_HAVE_DYNAMIC_FTRACE_WITH_REGS=y
++CONFIG_HAVE_DYNAMIC_FTRACE_WITH_DIRECT_CALLS=y
++CONFIG_HAVE_FTRACE_MCOUNT_RECORD=y
++CONFIG_HAVE_SYSCALL_TRACEPOINTS=y
++CONFIG_HAVE_FENTRY=y
++CONFIG_HAVE_C_RECORDMCOUNT=y
++CONFIG_TRACING_SUPPORT=y
++# CONFIG_FTRACE is not set
++# CONFIG_PROVIDE_OHCI1394_DMA_INIT is not set
++# CONFIG_SAMPLES is not set
++CONFIG_HAVE_ARCH_KCSAN=y
++CONFIG_ARCH_HAS_DEVMEM_IS_ALLOWED=y
++
++#
++# x86 Debugging
++#
++CONFIG_TRACE_IRQFLAGS_SUPPORT=y
++# CONFIG_X86_VERBOSE_BOOTUP is not set
++CONFIG_EARLY_PRINTK=y
++# CONFIG_EARLY_PRINTK_DBGP is not set
++# CONFIG_EARLY_PRINTK_USB_XDBC is not set
++# CONFIG_EFI_PGT_DUMP is not set
++# CONFIG_DEBUG_TLBFLUSH is not set
++CONFIG_HAVE_MMIOTRACE_SUPPORT=y
++# CONFIG_X86_DECODER_SELFTEST is not set
++CONFIG_IO_DELAY_0X80=y
++# CONFIG_IO_DELAY_0XED is not set
++# CONFIG_IO_DELAY_UDELAY is not set
++# CONFIG_IO_DELAY_NONE is not set
++# CONFIG_DEBUG_BOOT_PARAMS is not set
++# CONFIG_CPA_DEBUG is not set
++# CONFIG_DEBUG_ENTRY is not set
++# CONFIG_DEBUG_NMI_SELFTEST is not set
++# CONFIG_X86_DEBUG_FPU is not set
++# CONFIG_PUNIT_ATOM_DEBUG is not set
++# CONFIG_UNWINDER_ORC is not set
++# CONFIG_UNWINDER_FRAME_POINTER is not set
++CONFIG_UNWINDER_GUESS=y
++# end of x86 Debugging
++
++#
++# Kernel Testing and Coverage
++#
++# CONFIG_KUNIT is not set
++# CONFIG_NOTIFIER_ERROR_INJECTION is not set
++# CONFIG_FAULT_INJECTION is not set
++CONFIG_ARCH_HAS_KCOV=y
++CONFIG_CC_HAS_SANCOV_TRACE_PC=y
++# CONFIG_KCOV is not set
++# CONFIG_RUNTIME_TESTING_MENU is not set
++# CONFIG_MEMTEST is not set
++# end of Kernel Testing and Coverage
++# end of Kernel hacking
+diff --git a/arch/x86/include/asm/uefi_processor_bind.h b/arch/x86/include/asm/uefi_processor_bind.h
+new file mode 100644
+index 0000000..bb13ce1
+--- /dev/null
++++ b/arch/x86/include/asm/uefi_processor_bind.h
+@@ -0,0 +1,649 @@
++/** @file
++  Processor or Compiler specific defines and types x64 (Intel 64, AMD64).
++
++  Copyright (c) 2006 - 2019, Intel Corporation. All rights reserved.<BR>
++  SPDX-License-Identifier: BSD-2-Clause-Patent
++
++**/
++
++#ifndef __PROCESSOR_BIND_H__
++#define __PROCESSOR_BIND_H__
++
++///
++/// Define the processor type so other code can make processor based choices
++///
++#if defined(CONFIG_X86_64)
++
++  //
++  // Make sure we are using the correct packing rules per EFI specification
++  //
++  #if !defined(__GNUC__)
++  #pragma pack()
++  #endif
++
++  #if defined(__GNUC__) && defined(__pic__) && !defined(USING_LTO)  && !defined(__APPLE__)
++  //
++  // Mark all symbol declarations and references as hidden, meaning they will
++  // not be subject to symbol preemption. This allows the compiler to refer to
++  // symbols directly using relative references rather than via the GOT, which
++  // contains absolute symbol addresses that are subject to runtime relocation.
++  //
++  // The LTO linker will not emit GOT based relocations when all symbol
++  // references can be resolved locally, and so there is no need to set the
++  // pragma in that case (and doing so will cause other issues).
++  //
++  #pragma GCC visibility push (hidden)
++  #endif
++
++  #if defined(__INTEL_COMPILER)
++  //
++  // Disable ICC's remark #869: "Parameter" was never referenced warning.
++  // This is legal ANSI C code so we disable the remark that is turned on with -Wall
++  //
++  #pragma warning ( disable : 869 )
++
++  //
++  // Disable ICC's remark #1418: external function definition with no prior declaration.
++  // This is legal ANSI C code so we disable the remark that is turned on with /W4
++  //
++  #pragma warning ( disable : 1418 )
++
++  //
++  // Disable ICC's remark #1419: external declaration in primary source file
++  // This is legal ANSI C code so we disable the remark that is turned on with /W4
++  //
++  #pragma warning ( disable : 1419 )
++
++  //
++  // Disable ICC's remark #593: "Variable" was set but never used.
++  // This is legal ANSI C code so we disable the remark that is turned on with /W4
++  //
++  #pragma warning ( disable : 593 )
++
++  #endif
++
++
++  #if defined(_MSC_EXTENSIONS)
++
++  //
++  // Disable warning that make it impossible to compile at /W4
++  // This only works for Microsoft* tools
++  //
++
++  //
++  // Disabling bitfield type checking warnings.
++  //
++  #pragma warning ( disable : 4214 )
++
++  //
++  // Disabling the unreferenced formal parameter warnings.
++  //
++  #pragma warning ( disable : 4100 )
++
++  //
++  // Disable slightly different base types warning as CHAR8 * can not be set
++  // to a constant string.
++  //
++  #pragma warning ( disable : 4057 )
++
++  //
++  // ASSERT(FALSE) or while (TRUE) are legal constructs so suppress this warning
++  //
++  #pragma warning ( disable : 4127 )
++
++  //
++  // This warning is caused by functions defined but not used. For precompiled header only.
++  //
++  #pragma warning ( disable : 4505 )
++
++  //
++  // This warning is caused by empty (after preprocessing) source file. For precompiled header only.
++  //
++  #pragma warning ( disable : 4206 )
++
++  #if _MSC_VER == 1800 || _MSC_VER == 1900 || _MSC_VER >= 1910
++
++  //
++  // Disable these warnings for VS2013.
++  //
++
++  //
++  // This warning is for potentially uninitialized local variable, and it may cause false
++  // positive issues in VS2013 and VS2015 build
++  //
++  #pragma warning ( disable : 4701 )
++
++  //
++  // This warning is for potentially uninitialized local pointer variable, and it may cause
++  // false positive issues in VS2013 and VS2015 build
++  //
++  #pragma warning ( disable : 4703 )
++
++  #endif
++
++  #endif
++
++
++  #if defined(_MSC_EXTENSIONS)
++    //
++    // use Microsoft C compiler dependent integer width types
++    //
++
++    ///
++    /// 8-byte unsigned value
++    ///
++    typedef unsigned __int64    UINT64;
++    ///
++    /// 8-byte signed value
++    ///
++    typedef __int64             INT64;
++    ///
++    /// 4-byte unsigned value
++    ///
++    typedef unsigned __int32    UINT32;
++    ///
++    /// 4-byte signed value
++    ///
++    typedef __int32             INT32;
++    ///
++    /// 2-byte unsigned value
++    ///
++    typedef unsigned short      UINT16;
++    ///
++    /// 2-byte Character.  Unless otherwise specified all strings are stored in the
++    /// UTF-16 encoding format as defined by Unicode 2.1 and ISO/IEC 10646 standards.
++    ///
++    typedef unsigned short      CHAR16;
++    ///
++    /// 2-byte signed value
++    ///
++    typedef short               INT16;
++    ///
++    /// Logical Boolean.  1-byte value containing 0 for FALSE or a 1 for TRUE.  Other
++    /// values are undefined.
++    ///
++    typedef unsigned char       BOOLEAN;
++    ///
++    /// 1-byte unsigned value
++    ///
++    typedef unsigned char       UINT8;
++    ///
++    /// 1-byte Character
++    ///
++    typedef char                CHAR8;
++    ///
++    /// 1-byte signed value
++    ///
++    typedef signed char         INT8;
++  #else
++    ///
++    /// 8-byte unsigned value
++    ///
++    typedef unsigned long long  UINT64;
++    ///
++    /// 8-byte signed value
++    ///
++    typedef long long           INT64;
++    ///
++    /// 4-byte unsigned value
++    ///
++    typedef unsigned int        UINT32;
++    ///
++    /// 4-byte signed value
++    ///
++    typedef int                 INT32;
++    ///
++    /// 2-byte unsigned value
++    ///
++    typedef unsigned short      UINT16;
++    ///
++    /// 2-byte Character.  Unless otherwise specified all strings are stored in the
++    /// UTF-16 encoding format as defined by Unicode 2.1 and ISO/IEC 10646 standards.
++    ///
++    typedef unsigned short      CHAR16;
++    ///
++    /// 2-byte signed value
++    ///
++    typedef short               INT16;
++    ///
++    /// Logical Boolean.  1-byte value containing 0 for FALSE or a 1 for TRUE.  Other
++    /// values are undefined.
++    ///
++    typedef unsigned char       BOOLEAN;
++    ///
++    /// 1-byte unsigned value
++    ///
++    typedef unsigned char       UINT8;
++    ///
++    /// 1-byte Character
++    ///
++    typedef char                CHAR8;
++    ///
++    /// 1-byte signed value
++    ///
++    typedef signed char         INT8;
++  #endif
++
++  ///
++  /// Unsigned value of native width.  (4 bytes on supported 32-bit processor instructions,
++  /// 8 bytes on supported 64-bit processor instructions)
++  ///
++  typedef UINT64  UINTN;
++  ///
++  /// Signed value of native width.  (4 bytes on supported 32-bit processor instructions,
++  /// 8 bytes on supported 64-bit processor instructions)
++  ///
++  typedef INT64   INTN;
++
++
++  //
++  // Processor specific defines
++  //
++
++  ///
++  /// A value of native width with the highest bit set.
++  ///
++  #define MAX_BIT     0x8000000000000000ULL
++  ///
++  /// A value of native width with the two highest bits set.
++  ///
++  #define MAX_2_BITS  0xC000000000000000ULL
++
++  ///
++  /// Maximum legal x64 address
++  ///
++  #define MAX_ADDRESS   0xFFFFFFFFFFFFFFFFULL
++
++  ///
++  /// Maximum usable address at boot time
++  ///
++  #define MAX_ALLOC_ADDRESS   MAX_ADDRESS
++
++  ///
++  /// Maximum legal x64 INTN and UINTN values.
++  ///
++  #define MAX_INTN   ((INTN)0x7FFFFFFFFFFFFFFFULL)
++  #define MAX_UINTN  ((UINTN)0xFFFFFFFFFFFFFFFFULL)
++
++  ///
++  /// Minimum legal x64 INTN value.
++  ///
++  #define MIN_INTN   (((INTN)-9223372036854775807LL) - 1)
++
++  ///
++  /// The stack alignment required for x64
++  ///
++  #define CPU_STACK_ALIGNMENT   16
++
++  ///
++  /// Page allocation granularity for x64
++  ///
++  #define DEFAULT_PAGE_ALLOCATION_GRANULARITY   (0x1000)
++  #define RUNTIME_PAGE_ALLOCATION_GRANULARITY   (0x1000)
++
++  //
++  // Modifier to ensure that all protocol member functions and EFI intrinsics
++  // use the correct C calling convention. All protocol member functions and
++  // EFI intrinsics are required to modify their member functions with EFIAPI.
++  //
++  #ifdef EFIAPI
++    ///
++    /// If EFIAPI is already defined, then we use that definition.
++    ///
++  #elif defined(_MSC_EXTENSIONS)
++    ///
++    /// Microsoft* compiler specific method for EFIAPI calling convention.
++    ///
++    #define EFIAPI __cdecl
++  #elif defined(__GNUC__)
++    ///
++    /// Define the standard calling convention regardless of optimization level.
++    /// The GCC support assumes a GCC compiler that supports the EFI ABI. The EFI
++    /// ABI is much closer to the x64 Microsoft* ABI than standard x64 (x86-64)
++    /// GCC ABI. Thus a standard x64 (x86-64) GCC compiler can not be used for
++    /// x64. Warning the assembly code in the MDE x64 does not follow the correct
++    /// ABI for the standard x64 (x86-64) GCC.
++    ///
++    #define EFIAPI
++  #else
++    ///
++    /// The default for a non Microsoft* or GCC compiler is to assume the EFI ABI
++    /// is the standard.
++    ///
++    #define EFIAPI
++  #endif
++
++  #if defined(__GNUC__) || defined(__clang__)
++    ///
++    /// For GNU assembly code, .global or .globl can declare global symbols.
++    /// Define this macro to unify the usage.
++    ///
++    #define ASM_GLOBAL .globl
++  #endif
++
++  /**
++    Return the pointer to the first instruction of a function given a function pointer.
++    On x64 CPU architectures, these two pointer values are the same,
++    so the implementation of this macro is very simple.
++
++    @param  FunctionPointer   A pointer to a function.
++
++    @return The pointer to the first instruction of a function given a function pointer.
++
++  **/
++  #define FUNCTION_ENTRY_POINT(FunctionPointer) (VOID *)(UINTN)(FunctionPointer)
++
++  #ifndef __USER_LABEL_PREFIX__
++  #define __USER_LABEL_PREFIX__
++  #endif
++
++#else
++
++  //
++  // Make sure we are using the correct packing rules per EFI specification
++  //
++  #if !defined(__GNUC__)
++  #pragma pack()
++  #endif
++
++  #if defined(__INTEL_COMPILER)
++  //
++  // Disable ICC's remark #869: "Parameter" was never referenced warning.
++  // This is legal ANSI C code so we disable the remark that is turned on with -Wall
++  //
++  #pragma warning ( disable : 869 )
++
++  //
++  // Disable ICC's remark #1418: external function definition with no prior declaration.
++  // This is legal ANSI C code so we disable the remark that is turned on with /W4
++  //
++  #pragma warning ( disable : 1418 )
++
++  //
++  // Disable ICC's remark #1419: external declaration in primary source file
++  // This is legal ANSI C code so we disable the remark that is turned on with /W4
++  //
++  #pragma warning ( disable : 1419 )
++
++  //
++  // Disable ICC's remark #593: "Variable" was set but never used.
++  // This is legal ANSI C code so we disable the remark that is turned on with /W4
++  //
++  #pragma warning ( disable : 593 )
++
++  #endif
++
++
++  #if defined(_MSC_EXTENSIONS)
++
++  //
++  // Disable warning that make it impossible to compile at /W4
++  // This only works for Microsoft* tools
++  //
++
++  //
++  // Disabling bitfield type checking warnings.
++  //
++  #pragma warning ( disable : 4214 )
++
++  //
++  // Disabling the unreferenced formal parameter warnings.
++  //
++  #pragma warning ( disable : 4100 )
++
++  //
++  // Disable slightly different base types warning as CHAR8 * can not be set
++  // to a constant string.
++  //
++  #pragma warning ( disable : 4057 )
++
++  //
++  // ASSERT(FALSE) or while (TRUE) are legal constructs so suppress this warning
++  //
++  #pragma warning ( disable : 4127 )
++
++  //
++  // This warning is caused by functions defined but not used. For precompiled header only.
++  //
++  #pragma warning ( disable : 4505 )
++
++  //
++  // This warning is caused by empty (after preprocessing) source file. For precompiled header only.
++  //
++  #pragma warning ( disable : 4206 )
++
++  #if _MSC_VER == 1800 || _MSC_VER == 1900 || _MSC_VER >= 1910
++
++  //
++  // Disable these warnings for VS2013.
++  //
++
++  //
++  // This warning is for potentially uninitialized local variable, and it may cause false
++  // positive issues in VS2013 and VS2015 build
++  //
++  #pragma warning ( disable : 4701 )
++
++  //
++  // This warning is for potentially uninitialized local pointer variable, and it may cause
++  // false positive issues in VS2013 and VS2015 build
++  //
++  #pragma warning ( disable : 4703 )
++
++  #endif
++
++  #endif
++
++
++  #if defined(_MSC_EXTENSIONS)
++
++    //
++    // use Microsoft C compiler dependent integer width types
++    //
++
++    ///
++    /// 8-byte unsigned value.
++    ///
++    typedef unsigned __int64    UINT64;
++    ///
++    /// 8-byte signed value.
++    ///
++    typedef __int64             INT64;
++    ///
++    /// 4-byte unsigned value.
++    ///
++    typedef unsigned __int32    UINT32;
++    ///
++    /// 4-byte signed value.
++    ///
++    typedef __int32             INT32;
++    ///
++    /// 2-byte unsigned value.
++    ///
++    typedef unsigned short      UINT16;
++    ///
++    /// 2-byte Character.  Unless otherwise specified all strings are stored in the
++    /// UTF-16 encoding format as defined by Unicode 2.1 and ISO/IEC 10646 standards.
++    ///
++    typedef unsigned short      CHAR16;
++    ///
++    /// 2-byte signed value.
++    ///
++    typedef short               INT16;
++    ///
++    /// Logical Boolean.  1-byte value containing 0 for FALSE or a 1 for TRUE.  Other
++    /// values are undefined.
++    ///
++    typedef unsigned char       BOOLEAN;
++    ///
++    /// 1-byte unsigned value.
++    ///
++    typedef unsigned char       UINT8;
++    ///
++    /// 1-byte Character.
++    ///
++    typedef char                CHAR8;
++    ///
++    /// 1-byte signed value.
++    ///
++    typedef signed char         INT8;
++  #else
++    ///
++    /// 8-byte unsigned value.
++    ///
++    typedef unsigned long long  UINT64;
++    ///
++    /// 8-byte signed value.
++    ///
++    typedef long long           INT64;
++    ///
++    /// 4-byte unsigned value.
++    ///
++    typedef unsigned int        UINT32;
++    ///
++    /// 4-byte signed value.
++    ///
++    typedef int                 INT32;
++    ///
++    /// 2-byte unsigned value.
++    ///
++    typedef unsigned short      UINT16;
++    ///
++    /// 2-byte Character.  Unless otherwise specified all strings are stored in the
++    /// UTF-16 encoding format as defined by Unicode 2.1 and ISO/IEC 10646 standards.
++    ///
++    typedef unsigned short      CHAR16;
++    ///
++    /// 2-byte signed value.
++    ///
++    typedef short               INT16;
++    ///
++    /// Logical Boolean.  1-byte value containing 0 for FALSE or a 1 for TRUE.  Other
++    /// values are undefined.
++    ///
++    typedef unsigned char       BOOLEAN;
++    ///
++    /// 1-byte unsigned value.
++    ///
++    typedef unsigned char       UINT8;
++    ///
++    /// 1-byte Character
++    ///
++    typedef char                CHAR8;
++    ///
++    /// 1-byte signed value
++    ///
++    typedef signed char         INT8;
++  #endif
++
++  ///
++  /// Unsigned value of native width.  (4 bytes on supported 32-bit processor instructions;
++  /// 8 bytes on supported 64-bit processor instructions.)
++  ///
++  typedef UINT32  UINTN;
++  ///
++  /// Signed value of native width.  (4 bytes on supported 32-bit processor instructions;
++  /// 8 bytes on supported 64-bit processor instructions.)
++  ///
++  typedef INT32   INTN;
++
++  //
++  // Processor specific defines
++  //
++
++  ///
++  /// A value of native width with the highest bit set.
++  ///
++  #define MAX_BIT     0x80000000
++  ///
++  /// A value of native width with the two highest bits set.
++  ///
++  #define MAX_2_BITS  0xC0000000
++
++  ///
++  /// Maximum legal IA-32 address.
++  ///
++  #define MAX_ADDRESS   0xFFFFFFFF
++
++  ///
++  /// Maximum usable address at boot time
++  ///
++  #define MAX_ALLOC_ADDRESS   MAX_ADDRESS
++
++  ///
++  /// Maximum legal IA-32 INTN and UINTN values.
++  ///
++  #define MAX_INTN   ((INTN)0x7FFFFFFF)
++  #define MAX_UINTN  ((UINTN)0xFFFFFFFF)
++
++  ///
++  /// Minimum legal IA-32 INTN value.
++  ///
++  #define MIN_INTN   (((INTN)-2147483647) - 1)
++
++  ///
++  /// The stack alignment required for IA-32.
++  ///
++  #define CPU_STACK_ALIGNMENT   sizeof(UINTN)
++
++  ///
++  /// Page allocation granularity for IA-32.
++  ///
++  #define DEFAULT_PAGE_ALLOCATION_GRANULARITY   (0x1000)
++  #define RUNTIME_PAGE_ALLOCATION_GRANULARITY   (0x1000)
++
++  //
++  // Modifier to ensure that all protocol member functions and EFI intrinsics
++  // use the correct C calling convention. All protocol member functions and
++  // EFI intrinsics are required to modify their member functions with EFIAPI.
++  //
++  #ifdef EFIAPI
++    ///
++    /// If EFIAPI is already defined, then we use that definition.
++    ///
++  #elif defined(_MSC_EXTENSIONS)
++    ///
++    /// Microsoft* compiler specific method for EFIAPI calling convention.
++    ///
++    #define EFIAPI __cdecl
++  #elif defined(__GNUC__) || defined(__clang__)
++    ///
++    /// GCC specific method for EFIAPI calling convention.
++    ///
++    #define EFIAPI __attribute__((cdecl))
++  #else
++    ///
++    /// The default for a non Microsoft* or GCC compiler is to assume the EFI ABI
++    /// is the standard.
++    ///
++    #define EFIAPI
++  #endif
++
++  #if defined(__GNUC__) || defined(__clang__)
++    ///
++    /// For GNU assembly code, .global or .globl can declare global symbols.
++    /// Define this macro to unify the usage.
++    ///
++    #define ASM_GLOBAL .globl
++  #endif
++
++  /**
++    Return the pointer to the first instruction of a function given a function pointer.
++    On IA-32 CPU architectures, these two pointer values are the same,
++    so the implementation of this macro is very simple.
++
++    @param  FunctionPointer   A pointer to a function.
++
++    @return The pointer to the first instruction of a function given a function pointer.
++
++  **/
++  #define FUNCTION_ENTRY_POINT(FunctionPointer) (VOID *)(UINTN)(FunctionPointer)
++
++  #ifndef __USER_LABEL_PREFIX__
++  #define __USER_LABEL_PREFIX__ _
++  #endif
++
++  #endif
++
++#endif
++
+diff --git a/build b/build
+new file mode 100755
+index 0000000..3f1b963
+--- /dev/null
++++ b/build
+@@ -0,0 +1,5 @@
++#!/bin/bash
++
++make upld_defconfig
++make ARCH=x86_64 bzImage -j 8
++
+diff --git a/drivers/firmware/efi/libstub/Makefile b/drivers/firmware/efi/libstub/Makefile
+index 75daaf2..6486722 100644
+--- a/drivers/firmware/efi/libstub/Makefile
++++ b/drivers/firmware/efi/libstub/Makefile
+@@ -49,7 +49,7 @@ KCOV_INSTRUMENT			:= n
+ lib-y				:= efi-stub-helper.o gop.o secureboot.o tpm.o \
+ 				   file.o mem.o random.o randomalloc.o pci.o \
+ 				   skip_spaces.o lib-cmdline.o lib-ctype.o \
+-				   alignedmem.o relocate.o vsprintf.o
++				   alignedmem.o relocate.o vsprintf.o upayload.o
+ 
+ # include the stub's generic dependencies from lib/ when building for ARM/arm64
+ efi-deps-y := fdt_rw.c fdt_ro.c fdt_wip.c fdt.c fdt_empty_tree.c fdt_sw.c
+diff --git a/drivers/firmware/efi/libstub/efistub.h b/drivers/firmware/efi/libstub/efistub.h
+index 85050f5..b35b659 100644
+--- a/drivers/firmware/efi/libstub/efistub.h
++++ b/drivers/firmware/efi/libstub/efistub.h
+@@ -795,4 +795,7 @@ asmlinkage void __noreturn efi_enter_kernel(unsigned long entrypoint,
+ 
+ void efi_handle_post_ebs_state(void);
+ 
++struct boot_params *setup_boot_params(void *hob_list);
++void   upld_stub_entry (unsigned long image_base, struct boot_params *bp);
++
+ #endif
+diff --git a/drivers/firmware/efi/libstub/upayload.c b/drivers/firmware/efi/libstub/upayload.c
+new file mode 100644
+index 0000000..af56582
+--- /dev/null
++++ b/drivers/firmware/efi/libstub/upayload.c
+@@ -0,0 +1,427 @@
++// SPDX-License-Identifier: GPL-2.0-only
++
++/* -----------------------------------------------------------------------
++ *
++ *   Copyright 2020 Intel Corporation; author Xiang Ma
++ *
++ * ----------------------------------------------------------------------- */
++#include <linux/string.h>
++#include <asm/e820/types.h>
++#include <asm/setup.h>
++#include <asm/boot.h>
++#include "upayload.h"
++
++EFI_GUID gEfiGraphicsInfoHobGuid  =  { 0x39f62cce, 0x6825, 0x4669, { 0xbb, 0x56, 0x54, 0x1a, 0xba, 0x75, 0x3a, 0x07 }};
++EFI_GUID gLoaderMemoryMapInfoGuid =  { 0xa1ff7424, 0x7a1a, 0x478e, { 0xa9, 0xe4, 0x92, 0xf3, 0x57, 0xd1, 0x28, 0x32 } };
++EFI_GUID gEfiAcpi20TableGuid      =  { 0x8868E871, 0xE4F1, 0x11D3, { 0xBC, 0x22, 0x00, 0x80, 0xC7, 0x3C, 0x88, 0x81 }};
++
++#define   MAX_CMD_LINE_LEN        0x400
++CHAR8                             gCmdLineBuf[MAX_CMD_LINE_LEN];
++
++#define BOOTSIG                   0x1FE
++#define SETUP_HDR                 0x53726448  // "HdrS"
++#define DEF_CMD_LINE              "init=/init root=/dev/ram0 rw 3 console=ttyS0,115200 console=tty0"
++#define ACPI_RSDP_CMDLINE_STR     " acpi_rsdp="
++
++char * strcpy(char * dest,const char *src)
++{
++	char *tmp = dest;
++	while ((*dest++ = *src++) != '\0');
++	return tmp;
++}
++
++char * strcat(char * dest, const char * src)
++{
++	char *tmp = dest;
++	while (*dest)		dest++;
++	while ((*dest++ = *src++) != '\0');
++	return tmp;
++}
++
++/**
++  Returns the next instance of a HOB type from the starting HOB.
++
++  This function searches the first instance of a HOB type from the starting HOB pointer.
++  If there does not exist such HOB type from the starting HOB pointer, it will return NULL.
++  In contrast with macro GET_NEXT_HOB(), this function does not skip the starting HOB pointer
++  unconditionally: it returns HobStart back if HobStart itself meets the requirement;
++  caller is required to use GET_NEXT_HOB() if it wishes to skip current HobStart.
++
++  If HobStart is NULL, then ASSERT().
++
++  @param  Type          The HOB type to return.
++  @param  HobStart      The starting HOB pointer to search from.
++
++  @return The next instance of a HOB type from the starting HOB.
++
++**/
++STATIC
++VOID *
++EFIAPI
++UpldGetNextHob (
++  IN UINT16                 Type,
++  IN CONST VOID             *HobStart
++  )
++{
++  EFI_PEI_HOB_POINTERS  Hob;
++
++  Hob.Raw = (UINT8 *) HobStart;
++  //
++  // Parse the HOB list until end of list or matching type is found.
++  //
++  while (!END_OF_HOB_LIST (Hob)) {
++    if (Hob.Header->HobType == Type) {
++      return Hob.Raw;
++    }
++    Hob.Raw = GET_NEXT_HOB (Hob);
++  }
++  return NULL;
++}
++
++/**
++  Returns the next instance of the matched GUID HOB from the starting HOB.
++
++  This function searches the first instance of a HOB from the starting HOB pointer.
++  Such HOB should satisfy two conditions:
++  its HOB type is EFI_HOB_TYPE_GUID_EXTENSION and its GUID Name equals to the input Guid.
++  If there does not exist such HOB from the starting HOB pointer, it will return NULL.
++  Caller is required to apply GET_GUID_HOB_DATA () and GET_GUID_HOB_DATA_SIZE ()
++  to extract the data section and its size information, respectively.
++  In contrast with macro GET_NEXT_HOB(), this function does not skip the starting HOB pointer
++  unconditionally: it returns HobStart back if HobStart itself meets the requirement;
++  caller is required to use GET_NEXT_HOB() if it wishes to skip current HobStart.
++
++  If Guid is NULL, then ASSERT().
++  If HobStart is NULL, then ASSERT().
++
++  @param  Guid          The GUID to match with in the HOB list.
++  @param  HobStart      A pointer to a Guid.
++
++  @return The next instance of the matched GUID HOB from the starting HOB.
++
++**/
++STATIC
++VOID *
++EFIAPI
++UpldGetNextGuidHob (
++  IN CONST EFI_GUID         *Guid,
++  IN CONST VOID             *HobStart
++  )
++{
++  EFI_PEI_HOB_POINTERS  GuidHob;
++
++  GuidHob.Raw = (UINT8 *) HobStart;
++  while ((GuidHob.Raw = UpldGetNextHob (EFI_HOB_TYPE_GUID_EXTENSION, GuidHob.Raw)) != NULL) {
++    if (!memcmp (Guid, &GuidHob.Guid->Name, sizeof (EFI_GUID))) {
++      break;
++    }
++    GuidHob.Raw = GET_NEXT_HOB (GuidHob);
++  }
++  return GuidHob.Raw;
++}
++
++/**
++  Return the memory map info HOB data.
++
++  @retval   Pointer to the memory map info hob.
++            NULL if HOB is not found.
++
++**/
++STATIC
++MEMORY_MAP_INFO *
++EFIAPI
++UpldGetMemoryMapInfo (
++  IN  VOID   *HobList
++  )
++{
++  EFI_HOB_GUID_TYPE             *GuidHob;
++
++  GuidHob = UpldGetNextGuidHob (&gLoaderMemoryMapInfoGuid, HobList);
++  if (GuidHob == NULL) {
++    return NULL;
++  }
++  return (MEMORY_MAP_INFO *)GET_GUID_HOB_DATA (GuidHob);
++}
++
++
++/**
++  Check if the image is a bootable Linux image.
++
++  @param[in]  ImageBase      Memory address of an image
++
++  @retval     TRUE           Image is a bootable kernel image
++  @retval     FALSE          Not a bootable kernel image
++**/
++BOOLEAN
++EFIAPI
++UpldIsBzImage (
++  IN  CONST VOID             *ImageBase
++  )
++{
++  BOOT_PARAMS                *Bp;
++
++  Bp = (BOOT_PARAMS *) ImageBase;
++  if (Bp == NULL) {
++    return FALSE;
++  }
++
++  // Check boot sector Signature
++  if ((Bp->Hdr.Signature != 0xAA55) || (Bp->Hdr.Header != SETUP_HDR)) {
++    return FALSE;
++  }
++
++  return TRUE;
++}
++
++/**
++  Load linux kernel image to specified address and setup boot parameters.
++
++  @param[in]  KernelBase     Memory address of an kernel image.
++  @param[in]  InitRdBase     Memory address of an InitRd image.
++  @param[in]  InitRdLen      InitRd image size.
++  @param[in]  CmdLineBase    Memory address of command line buffer.
++  @param[in]  CmdLineLen     Command line buffer size.
++
++  @retval EFI_INVALID_PARAMETER   Input parameters are not valid.
++  @retval EFI_UNSUPPORTED         Unsupported binary type.
++  @retval EFI_SUCCESS             Kernel is loaded successfully.
++**/
++EFI_STATUS
++EFIAPI
++UpldLoadBzImage (
++  IN  CONST VOID                  *KernelBase,
++  IN  CONST VOID                  *InitRdBase,
++  IN      UINT32                   InitRdLen,
++  IN  CONST VOID                  *CmdLineBase,
++  IN      UINT32                   CmdLineLen
++  )
++{
++  BOOT_PARAMS                *Bp;
++  UINT32                      BootParamSize;
++  UINTN                       KernelSize;
++  VOID CONST                 *ImageBase;
++
++  ImageBase = KernelBase;
++  if (ImageBase == NULL) {
++    return EFI_INVALID_PARAMETER;
++  }
++
++  if (!UpldIsBzImage (ImageBase)) {
++    return EFI_UNSUPPORTED;
++  }
++
++  Bp = (BOOT_PARAMS *) ImageBase;
++  if (Bp->Hdr.SetupSectorss != 0) {
++    BootParamSize = (Bp->Hdr.SetupSectorss + 1) * 512;
++  } else {
++    BootParamSize = 5 * 512;
++  }
++
++  KernelSize = Bp->Hdr.SysSize * 16;
++  memcpy ((VOID *)(UINTN)Bp->Hdr.PrefAddress, (UINT8 *)ImageBase + BootParamSize, KernelSize);
++	Bp->Hdr.Code32Start = Bp->Hdr.PrefAddress;
++
++  //
++  // Update boot params
++  //
++  Bp->Hdr.LoaderId     = 0xff;
++  Bp->Hdr.CmdLinePtr   = (UINT32)(UINTN)CmdLineBase;
++  Bp->Hdr.CmdlineSize  = CmdLineLen;
++  Bp->Hdr.RamDiskStart = (UINT32)(UINTN)InitRdBase;
++  Bp->Hdr.RamDisklen   = InitRdLen;
++
++  return EFI_SUCCESS;
++}
++
++
++CHAR8 *
++Uint32ToHex (
++  UINT32   Val,
++  CHAR8   *Buf
++)
++{
++  int     i;
++  CHAR8  ch;
++
++  Buf[0] = '0';
++  Buf[1] = 'x';
++  for (i = 2; i < 10; i++) {
++    ch = (Val >> 28) & 0x0F;  
++    if (ch > 9) ch = ch - 10 + 'a';
++    else ch = ch + '0';
++    Buf[i] = ch;
++    Val <<= 4;
++  }
++  Buf[i] = 0;
++  return Buf;
++}
++
++/**
++  Update linux kernel boot parameters.
++
++  @param[in]  Bp             BootParams address to be updated
++
++**/
++VOID
++EFIAPI
++UpldUpdateLinuxBootParams (
++  IN  VOID                   *HobList,
++  IN  VOID                   *KernelBase
++  )
++{
++  EFI_HOB_GUID_TYPE          *GuidHob;
++  EFI_PEI_GRAPHICS_INFO_HOB  *GfxInfoHob;
++  UINTN                       MemoryMapSize;
++  E820_ENTRY                 *E820Entry;
++  MEMORY_MAP_INFO            *MapInfo;
++  UINTN                       Index;
++  EFI_GRAPHICS_OUTPUT_MODE_INFORMATION *GfxMode;
++  CHAR8                       ParamValue[64];
++  ACPI_TABLE_HOB             *AcpiTable;
++  BOOT_PARAMS                *Bp;
++
++  Bp = (BOOT_PARAMS *)KernelBase;
++  if (Bp == NULL) {
++    return;
++  }
++
++  //
++  // Get graphics data
++  //
++  GuidHob = UpldGetNextGuidHob (&gEfiGraphicsInfoHobGuid, HobList);
++  if (GuidHob != NULL) {
++    GfxInfoHob = (EFI_PEI_GRAPHICS_INFO_HOB *)GET_GUID_HOB_DATA (GuidHob);
++    memset (&Bp->ScreenInfo, 0, sizeof (Bp->ScreenInfo));
++    GfxMode = &GfxInfoHob->GraphicsMode;
++    if (GfxMode->PixelFormat == PixelRedGreenBlueReserved8BitPerColor) {
++      Bp->ScreenInfo.RedPos   = 0;
++      Bp->ScreenInfo.BluePos  = 16;
++    } else if (GfxMode->PixelFormat == PixelBlueGreenRedReserved8BitPerColor) {
++      Bp->ScreenInfo.RedPos   = 16;
++      Bp->ScreenInfo.BluePos  = 0;
++    } else {
++      // Unsupported format
++      GfxMode = NULL;
++    }
++    if (GfxMode != NULL) {
++      Bp->ScreenInfo.OrigVideoIsVGA  = VIDEO_TYPE_EFI;
++      Bp->ScreenInfo.LfbLinelength   = (UINT16) (GfxMode->PixelsPerScanLine * 4);
++      Bp->ScreenInfo.LfbDepth        = 32;
++      Bp->ScreenInfo.LfbBase         = (UINT32)(UINTN)GfxInfoHob->FrameBufferBase;
++      Bp->ScreenInfo.ExtLfbBase      = (UINT32)(GfxInfoHob->FrameBufferBase >> 32);
++      Bp->ScreenInfo.Capabilities   |= VIDEO_CAPABILITY_64BIT_BASE;
++      Bp->ScreenInfo.LfbWidth        = (UINT16)GfxMode->HorizontalResolution;
++      Bp->ScreenInfo.LfbHeight       = (UINT16)GfxMode->VerticalResolution;
++      Bp->ScreenInfo.Pages           = 1;
++      Bp->ScreenInfo.RedSize         = 8;
++      Bp->ScreenInfo.GreenSize       = 8;
++      Bp->ScreenInfo.BlueSize        = 8;
++      Bp->ScreenInfo.RsvdSize        = 8;
++      Bp->ScreenInfo.GreenPos        = 8;
++      Bp->ScreenInfo.RsvdPos         = 24;
++    }
++  }
++
++  // Get memory map
++  E820Entry = &Bp->E820Map[0];
++  MemoryMapSize = (UINTN)ARRAY_SIZE (Bp->E820Map);
++  MapInfo = UpldGetMemoryMapInfo (HobList);
++  for (Index = 0; Index < MapInfo->Count && Index < MemoryMapSize; Index++) {
++    E820Entry->Type = (UINT32)MapInfo->Entry[Index].Type;
++    E820Entry->Addr = MapInfo->Entry[Index].Base;
++    E820Entry->Size = MapInfo->Entry[Index].Size;
++    E820Entry++;
++  }
++  Bp->E820Entries = (UINT8)MapInfo->Count;
++
++  //
++  // Append acpi_rsdp only if it does not exist in the kernel command line
++  // to allow a user override acpi_rdsp kernel parameter.
++  // To check the existence, simply search for "acpi_rsdp=" string since it's
++  // case-sensitive with the immediate '=' trailing according to kernel spec.
++  //
++  if (strstr ((CHAR8 *)(UINTN)Bp->Hdr.CmdLinePtr,(CHAR8 *)ACPI_RSDP_CMDLINE_STR) == NULL) {
++    GuidHob = UpldGetNextGuidHob (&gEfiAcpi20TableGuid, HobList);
++    if (GuidHob != NULL) {
++      CHAR8   Buf[64];
++      AcpiTable = (ACPI_TABLE_HOB *)GET_GUID_HOB_DATA (GuidHob);
++      strcpy (ParamValue, ACPI_RSDP_CMDLINE_STR);
++      strcat (ParamValue, Uint32ToHex((UINT32)AcpiTable->TableAddress, Buf));
++      strcat ((CHAR8 *)(UINTN)Bp->Hdr.CmdLinePtr, ParamValue);
++      Bp->Hdr.CmdlineSize = (UINT32)strlen ((CHAR8 *)(UINTN)Bp->Hdr.CmdLinePtr);
++    }
++  }
++}
++
++/**
++  Load linux kernel image to specified address and setup boot parameters.
++
++  @param[in]  HobList      HOB list pointer.
++  @param[in]  KernelBase   Kernel image base.
++**/
++VOID
++EFIAPI
++UpldLinuxBoot (
++  IN VOID   *HobList,
++  IN VOID   *KernelBase
++  )
++{
++  BOOT_PARAMS   *Bp;
++  UINTN          KernelStart;
++
++  Bp = (BOOT_PARAMS *)KernelBase;
++  if (Bp != NULL) {
++    UpldUpdateLinuxBootParams (HobList, Bp);
++    KernelStart = ((UINTN)Bp->Hdr.Code32Start - 0x100000) + (UINTN)Bp->Hdr.PrefAddress;
++  }
++}
++
++struct boot_params *
++EFIAPI
++setup_boot_params(void *HobList)
++{
++  EFI_STATUS                  Status;
++  UINT8                      *Ptr;
++  UINT8                      *End;
++  BOOT_PARAMS                *Bp;
++  EFI_HOB_GENERIC_HEADER     *HobHdr;
++	extern UINT32               _head;
++
++  if (HobList != NULL) {
++    HobHdr = (EFI_HOB_GENERIC_HEADER *)HobList;
++    if ((HobHdr->HobType != EFI_HOB_TYPE_HANDOFF) || HobHdr->HobLength != sizeof(EFI_HOB_HANDOFF_INFO_TABLE)) {
++      return NULL;
++    }
++  } else {
++    return NULL;
++  }
++
++  Ptr = (UINT8 *)((UINTN)&_head & ~(SIZE_4KB - 1));
++  End = Ptr - SIZE_64KB;
++  while (Ptr > End) {
++    Bp = (BOOT_PARAMS *)Ptr;
++    if ((Bp->Hdr.Signature == 0xAA55) && (Bp->Hdr.Header == SETUP_HDR)) {
++      break;
++    }
++    Ptr -= SIZE_4KB;
++  }
++
++  if (Ptr > End) {
++    strcpy (gCmdLineBuf, DEF_CMD_LINE);
++    Status = UpldLoadBzImage ((VOID*)Bp, NULL, 0, gCmdLineBuf, MAX_CMD_LINE_LEN);
++    if (Status == 0) {
++      UpldLinuxBoot (HobList, (VOID *)Bp);
++    } else {
++      Bp = NULL;
++    }
++  } else {
++    Bp = NULL;
++  }
++
++  if (Bp == NULL) {
++    while (1)
++      asm("hlt");
++  }
++
++	return (struct boot_params *)Bp;
++}
+diff --git a/drivers/firmware/efi/libstub/upayload.h b/drivers/firmware/efi/libstub/upayload.h
+new file mode 100644
+index 0000000..bb1e04e
+--- /dev/null
++++ b/drivers/firmware/efi/libstub/upayload.h
+@@ -0,0 +1,277 @@
++/** @file
++  Defines data types and constants introduced in UEFI.
++
++Copyright (c) 2006 - 2018, Intel Corporation. All rights reserved.<BR>
++Portions copyright (c) 2011 - 2016, ARM Ltd. All rights reserved.<BR>
++
++SPDX-License-Identifier: BSD-2-Clause-Patent
++
++**/
++
++#ifndef __UNIVERSAL_PAYLOAD_H__
++#define __UNIVERSAL_PAYLOAD_H__
++
++#include <linux/uefi_base_type.h>
++#include <linux/uefi_pi_bootmode.h>
++#include <linux/uefi_multi_phase.h>
++#include <linux/uefi_pi_hob.h>
++
++#define GET_HOB_TYPE(HobStart) \
++        ((*(EFI_HOB_GENERIC_HEADER **)&(HobStart))->HobType)
++
++#define GET_HOB_LENGTH(HobStart) \
++        ((*(EFI_HOB_GENERIC_HEADER **)&(HobStart))->HobLength)
++
++#define END_OF_HOB_LIST(HobStart) \
++        (GET_HOB_TYPE (HobStart) == (UINT16)EFI_HOB_TYPE_END_OF_HOB_LIST)
++
++#define GET_NEXT_HOB(HobStart) \
++        (VOID *)(*(UINT8 **)&(HobStart) + GET_HOB_LENGTH (HobStart))
++
++#define GET_GUID_HOB_DATA(HobStart) \
++        (VOID *)(*(UINT8 **)&(HobStart) + sizeof (EFI_HOB_GUID_TYPE))
++
++#define GET_GUID_HOB_DATA_SIZE(HobStart) \
++        (UINT16)(GET_HOB_LENGTH (HobStart) - sizeof (EFI_HOB_GUID_TYPE))
++
++typedef struct {
++  UINT32            RedMask;
++  UINT32            GreenMask;
++  UINT32            BlueMask;
++  UINT32            ReservedMask;
++} EFI_PIXEL_BITMASK;
++
++typedef enum {
++  ///
++  /// A pixel is 32-bits and byte zero represents red, byte one represents green,
++  /// byte two represents blue, and byte three is reserved. This is the definition
++  /// for the physical frame buffer. The byte values for the red, green, and blue
++  /// components represent the color intensity. This color intensity value range
++  /// from a minimum intensity of 0 to maximum intensity of 255.
++  ///
++  PixelRedGreenBlueReserved8BitPerColor,
++  ///
++  /// A pixel is 32-bits and byte zero represents blue, byte one represents green,
++  /// byte two represents red, and byte three is reserved. This is the definition
++  /// for the physical frame buffer. The byte values for the red, green, and blue
++  /// components represent the color intensity. This color intensity value range
++  /// from a minimum intensity of 0 to maximum intensity of 255.
++  ///
++  PixelBlueGreenRedReserved8BitPerColor,
++  ///
++  /// The Pixel definition of the physical frame buffer.
++  ///
++  PixelBitMask,
++  ///
++  /// This mode does not support a physical frame buffer.
++  ///
++  PixelBltOnly,
++  ///
++  /// Valid EFI_GRAPHICS_PIXEL_FORMAT enum values are less than this value.
++  ///
++  PixelFormatMax
++} EFI_GRAPHICS_PIXEL_FORMAT;
++
++typedef struct {
++  ///
++  /// The version of this data structure. A value of zero represents the
++  /// EFI_GRAPHICS_OUTPUT_MODE_INFORMATION structure as defined in this specification.
++  ///
++  UINT32                     Version;
++  ///
++  /// The size of video screen in pixels in the X dimension.
++  ///
++  UINT32                     HorizontalResolution;
++  ///
++  /// The size of video screen in pixels in the Y dimension.
++  ///
++  UINT32                     VerticalResolution;
++  ///
++  /// Enumeration that defines the physical format of the pixel. A value of PixelBltOnly
++  /// implies that a linear frame buffer is not available for this mode.
++  ///
++  EFI_GRAPHICS_PIXEL_FORMAT  PixelFormat;
++  ///
++  /// This bit-mask is only valid if PixelFormat is set to PixelPixelBitMask.
++  /// A bit being set defines what bits are used for what purpose such as Red, Green, Blue, or Reserved.
++  ///
++  EFI_PIXEL_BITMASK          PixelInformation;
++  ///
++  /// Defines the number of pixel elements per video memory line.
++  ///
++  UINT32                     PixelsPerScanLine;
++} EFI_GRAPHICS_OUTPUT_MODE_INFORMATION;
++
++typedef struct {
++  EFI_PHYSICAL_ADDRESS                  FrameBufferBase;
++  UINT32                                FrameBufferSize;
++  EFI_GRAPHICS_OUTPUT_MODE_INFORMATION  GraphicsMode;
++} EFI_PEI_GRAPHICS_INFO_HOB;
++
++#pragma pack(1)
++///
++/// Bootloader acpi table hob
++///
++typedef struct {
++   UINT64                  TableAddress;
++} ACPI_TABLE_HOB;
++#pragma pack()
++
++
++#pragma pack(1)
++typedef struct {
++  UINT64 Base;
++  UINT64 Size;
++  UINT8  Type;
++  UINT8  Flag;
++  UINT8  Reserved[6];
++  UINT32 Type2;
++  UINT32 Attribute;
++} MEMORY_MAP_ENTRY;
++
++typedef struct {
++  UINT8  Revision;
++  UINT8  Reserved0[3];
++  UINT32 Count;
++  MEMORY_MAP_ENTRY  Entry[0];
++} MEMORY_MAP_INFO;
++#pragma pack()
++
++#pragma pack(1)
++
++typedef struct {
++  UINT8     SetupSectorss;   /* Sectors for setup code */
++  UINT16    RootFlags;
++  UINT32    SysSize;
++  UINT16    RamSize;
++  UINT16    VideoMode;
++  UINT16    RootDev;
++  UINT16    Signature;   /* Boot Signature */
++  UINT16    Jump;
++  UINT32    Header;
++  UINT16    Version;
++  UINT16    SuSwitch;
++  UINT16    SetupSeg;
++  UINT16    StartSys;
++  UINT16    KernalVer;
++  UINT8     LoaderId;
++  UINT8     LoadFlags;
++  UINT16    MoveSize;
++  UINT32    Code32Start;    /* Start of code loaded high */
++  UINT32    RamDiskStart;   /* Start of initial ramdisk */
++  UINT32    RamDisklen; /* Length of initial ramdisk */
++  UINT32    BootsectorKludge;
++  UINT16    HeapEnd;
++  UINT8     ExtLoaderVer;  /* Extended boot loader version */
++  UINT8     ExtLoaderType; /* Extended boot loader ID */
++  UINT32    CmdLinePtr;   /* 32-bit pointer to the kernel command line */
++  UINT32    RamDiskMax;    /* Highest legal initrd address */
++  UINT32    KernelAlignment; /* Physical addr alignment required for kernel */
++  UINT8     RelocatableKernel; /* Whether kernel is relocatable or not */
++  UINT8     MinAlignment;
++  UINT16    XloadFlags;
++  UINT32    CmdlineSize;
++  UINT32    HardwareSubarch;
++  UINT64    HardwareSubarchData;
++  UINT32    PayloadOffset;
++  UINT32    PayloadLength;
++  UINT64    SetupData;
++  UINT64    PrefAddress;
++  UINT32    InitSize;
++  UINT32    HandoverOffset;
++} SETUP_HEADER;
++
++typedef struct {
++  UINT32    EfiLoaderSignature;
++  UINT32    EfiSystab;
++  UINT32    EfiMemdescSize;
++  UINT32    EfiMemdescVersion;
++  UINT32    EfiMemmap;
++  UINT32    EfiMemmapSize;
++  UINT32    EfiSystabHi;
++  UINT32    EfiMemmapHi;
++} EFI_INFO;
++
++typedef struct {
++  UINT64    Addr;        /* start of memory segment */
++  UINT64    Size;        /* size of memory segment */
++  UINT32    Type;        /* Type of memory segment */
++} E820_ENTRY;
++
++typedef struct {
++  UINT8     OrigX;           /* 0x00 */
++  UINT8     OrigY;           /* 0x01 */
++  UINT16    ExtMemK;         /* 0x02 */
++  UINT16    OrigVideoPage;   /* 0x04 */
++  UINT8     OrigVideoMode;   /* 0x06 */
++  UINT8     OrigVideoCols;   /* 0x07 */
++  UINT8     Flags;           /* 0x08 */
++  UINT8     Unused2;         /* 0x09 */
++  UINT16    OrigVideoEgaBx;  /* 0x0a */
++  UINT16    Unused3;         /* 0x0c */
++  UINT8     OrigVideoLines;  /* 0x0e */
++  UINT8     OrigVideoIsVGA;  /* 0x0f */
++  UINT16    OrigVideoPoints; /* 0x10 */
++
++  /* VESA graphic mode -- linear frame buffer */
++  UINT16    LfbWidth;          /* 0x12 */
++  UINT16    LfbHeight;         /* 0x14 */
++  UINT16    LfbDepth;          /* 0x16 */
++  UINT32    LfbBase;           /* 0x18 */
++  UINT32    LfbSize;           /* 0x1c */
++  UINT16    ClMagic, ClOffset; /* 0x20 */
++  UINT16    LfbLinelength;     /* 0x24 */
++  UINT8     RedSize;           /* 0x26 */
++  UINT8     RedPos;            /* 0x27 */
++  UINT8     GreenSize;         /* 0x28 */
++  UINT8     GreenPos;          /* 0x29 */
++  UINT8     BlueSize;          /* 0x2a */
++  UINT8     BluePos;           /* 0x2b */
++  UINT8     RsvdSize;          /* 0x2c */
++  UINT8     RsvdPos;           /* 0x2d */
++  UINT16    VesapmSeg;         /* 0x2e */
++  UINT16    VesapmOff;         /* 0x30 */
++  UINT16    Pages;             /* 0x32 */
++  UINT16    VesaAttributes;    /* 0x34 */
++  UINT32    Capabilities;      /* 0x36 */
++  UINT32    ExtLfbBase;        /* 0x3a */
++  UINT8     Reserved[2];       /* 0x3e */
++} SCREEN_INFO;
++
++typedef struct {
++  SCREEN_INFO   ScreenInfo;
++  UINT8         ApmBiosInfo[0x14];
++  UINT8         Pad2[4];
++  UINT64        TbootAddr;
++  UINT8         IstInfo[0x10];
++  UINT8         Pad3[16];
++  UINT8         Hd0Info[16];
++  UINT8         Hd1Info[16];
++  UINT8         SysDescTable[0x10];
++  UINT8         OlpcOfwHeader[0x10];
++  UINT8         Pad4[128];
++  UINT8         EdidInfo[0x80];
++  EFI_INFO      EfiInfo;
++  UINT32        AltMemk;
++  UINT32        Scratch;
++  UINT8         E820Entries;
++  UINT8         EddbufEntries;
++  UINT8         EddMbrSigBufEntries;
++  UINT8         Pad6[6];
++  SETUP_HEADER  Hdr;
++  UINT8         Pad7[0x290 - 0x1f1 - sizeof (SETUP_HEADER)];
++  UINT32        EddMbrSigBuffer[16];
++  E820_ENTRY    E820Map[128];
++  UINT8         Pad8[48];
++  UINT8         Eddbuf[0x1ec];
++  UINT8         Pad9[276];
++} BOOT_PARAMS;
++
++typedef struct {
++  UINT16        Limit;
++  UINT64       *Base;
++} DT_ADDR;
++
++#pragma pack()
++
++#endif
+diff --git a/drivers/firmware/efi/libstub/x86-stub.c b/drivers/firmware/efi/libstub/x86-stub.c
+index 3672539..1c1a791 100644
+--- a/drivers/firmware/efi/libstub/x86-stub.c
++++ b/drivers/firmware/efi/libstub/x86-stub.c
+@@ -363,6 +363,11 @@ efi_status_t __efiapi efi_pe_entry(efi_handle_t handle,
+ 	efi_status_t status;
+ 	char *cmdline_ptr;
+ 
++  boot_params = setup_boot_params((void *)handle);
++  if (boot_params != NULL) {
++		upld_stub_entry (boot_params->hdr.pref_address, boot_params);
++	}
++
+ 	efi_system_table = sys_table_arg;
+ 
+ 	/* Check if we were booted by the EFI firmware */
+diff --git a/include/linux/uefi_base.h b/include/linux/uefi_base.h
+new file mode 100644
+index 0000000..b5b869a
+--- /dev/null
++++ b/include/linux/uefi_base.h
+@@ -0,0 +1,1319 @@
++/** @file
++  Root include file for Mde Package Base type modules
++
++  This is the include file for any module of type base. Base modules only use
++  types defined via this include file and can be ported easily to any
++  environment. There are a set of base libraries in the Mde Package that can
++  be used to implement base modules.
++
++Copyright (c) 2006 - 2018, Intel Corporation. All rights reserved.<BR>
++Portions copyright (c) 2008 - 2009, Apple Inc. All rights reserved.<BR>
++SPDX-License-Identifier: BSD-2-Clause-Patent
++
++**/
++
++
++#ifndef __BASE_H__
++#define __BASE_H__
++
++//
++// Include processor specific binding
++//
++#include <asm/uefi_processor_bind.h>
++
++#if defined(_MSC_EXTENSIONS)
++//
++// Disable warning when last field of data structure is a zero sized array.
++//
++#pragma warning ( disable : 4200 )
++#endif
++
++//
++// The Microsoft* C compiler can removed references to unreferenced data items
++//  if the /OPT:REF linker option is used. We defined a macro as this is a
++//  a non standard extension
++//
++#if defined(_MSC_EXTENSIONS) && _MSC_VER < 1800 && !defined (MDE_CPU_EBC)
++  ///
++  /// Remove global variable from the linked image if there are no references to
++  /// it after all compiler and linker optimizations have been performed.
++  ///
++  ///
++  #define GLOBAL_REMOVE_IF_UNREFERENCED __declspec(selectany)
++#else
++  ///
++  /// Remove the global variable from the linked image if there are no references
++  ///  to it after all compiler and linker optimizations have been performed.
++  ///
++  ///
++  #define GLOBAL_REMOVE_IF_UNREFERENCED
++#endif
++
++//
++// Should be used in combination with NORETURN to avoid 'noreturn' returns
++// warnings.
++//
++#ifndef UNREACHABLE
++  #ifdef __GNUC__
++    ///
++    /// Signal compilers and analyzers that this call is not reachable.  It is
++    /// up to the compiler to remove any code past that point.
++    ///
++    #define UNREACHABLE()  __builtin_unreachable ()
++  #elif defined (__has_feature)
++    #if __has_builtin (__builtin_unreachable)
++      ///
++      /// Signal compilers and analyzers that this call is not reachable.  It is
++      /// up to the compiler to remove any code past that point.
++      ///
++      #define UNREACHABLE()  __builtin_unreachable ()
++    #endif
++  #endif
++
++  #ifndef UNREACHABLE
++    ///
++    /// Signal compilers and analyzers that this call is not reachable.  It is
++    /// up to the compiler to remove any code past that point.
++    ///
++    #define UNREACHABLE()
++  #endif
++#endif
++
++//
++// Signaling compilers and analyzers that a certain function cannot return may
++// remove all following code and thus lead to better optimization and less
++// false positives.
++//
++#ifndef NORETURN
++  #if defined (__GNUC__) || defined (__clang__)
++    ///
++    /// Signal compilers and analyzers that the function cannot return.
++    /// It is up to the compiler to remove any code past a call to functions
++    /// flagged with this attribute.
++    ///
++    #define NORETURN  __attribute__((noreturn))
++  #elif defined(_MSC_EXTENSIONS) && !defined(MDE_CPU_EBC)
++    ///
++    /// Signal compilers and analyzers that the function cannot return.
++    /// It is up to the compiler to remove any code past a call to functions
++    /// flagged with this attribute.
++    ///
++    #define NORETURN  __declspec(noreturn)
++  #else
++    ///
++    /// Signal compilers and analyzers that the function cannot return.
++    /// It is up to the compiler to remove any code past a call to functions
++    /// flagged with this attribute.
++    ///
++    #define NORETURN
++  #endif
++#endif
++
++//
++// Should be used in combination with ANALYZER_NORETURN to avoid 'noreturn'
++// returns warnings.
++//
++#ifndef ANALYZER_UNREACHABLE
++  #ifdef __clang_analyzer__
++    #if __has_builtin (__builtin_unreachable)
++      ///
++      /// Signal the analyzer that this call is not reachable.
++      /// This excludes compilers.
++      ///
++      #define ANALYZER_UNREACHABLE()  __builtin_unreachable ()
++    #endif
++  #endif
++
++  #ifndef ANALYZER_UNREACHABLE
++    ///
++    /// Signal the analyzer that this call is not reachable.
++    /// This excludes compilers.
++    ///
++    #define ANALYZER_UNREACHABLE()
++  #endif
++#endif
++
++//
++// Static Analyzers may issue errors about potential NULL-dereferences when
++// dereferencing a pointer, that has been checked before, outside of a
++// NULL-check.  This may lead to false positives, such as when using ASSERT()
++// for verification.
++//
++#ifndef ANALYZER_NORETURN
++  #ifdef __has_feature
++    #if __has_feature (attribute_analyzer_noreturn)
++      ///
++      /// Signal analyzers that the function cannot return.
++      /// This excludes compilers.
++      ///
++      #define ANALYZER_NORETURN  __attribute__((analyzer_noreturn))
++    #endif
++  #endif
++
++  #ifndef ANALYZER_NORETURN
++    ///
++    /// Signal the analyzer that the function cannot return.
++    /// This excludes compilers.
++    ///
++    #define ANALYZER_NORETURN
++  #endif
++#endif
++
++///
++/// Tell the code optimizer that the function will return twice.
++/// This prevents wrong optimizations which can cause bugs.
++///
++#ifndef RETURNS_TWICE
++  #if defined (__GNUC__) || defined (__clang__)
++    ///
++    /// Tell the code optimizer that the function will return twice.
++    /// This prevents wrong optimizations which can cause bugs.
++    ///
++    #define RETURNS_TWICE  __attribute__((returns_twice))
++  #else
++    ///
++    /// Tell the code optimizer that the function will return twice.
++    /// This prevents wrong optimizations which can cause bugs.
++    ///
++    #define RETURNS_TWICE
++  #endif
++#endif
++
++//
++// For symbol name in assembly code, an extra "_" is sometimes necessary
++//
++
++///
++/// Private worker functions for ASM_PFX()
++///
++#define _CONCATENATE(a, b)  __CONCATENATE(a, b)
++#define __CONCATENATE(a, b) a ## b
++
++///
++/// The __USER_LABEL_PREFIX__ macro predefined by GNUC represents the prefix
++/// on symbols in assembly language.
++///
++#define ASM_PFX(name) _CONCATENATE (__USER_LABEL_PREFIX__, name)
++
++#if __APPLE__
++  //
++  // Apple extension that is used by the linker to optimize code size
++  // with assembly functions. Put at the end of your .S files
++  //
++  #define ASM_FUNCTION_REMOVE_IF_UNREFERENCED  .subsections_via_symbols
++#else
++  #define ASM_FUNCTION_REMOVE_IF_UNREFERENCED
++#endif
++
++#ifdef __CC_ARM
++  //
++  // Older RVCT ARM compilers don't fully support #pragma pack and require __packed
++  // as a prefix for the structure.
++  //
++  #define PACKED  __packed
++#else
++  #define PACKED
++#endif
++
++///
++/// 128 bit buffer containing a unique identifier value.
++/// Unless otherwise specified, aligned on a 64 bit boundary.
++///
++typedef struct {
++  UINT32  Data1;
++  UINT16  Data2;
++  UINT16  Data3;
++  UINT8   Data4[8];
++} GUID;
++
++///
++/// 4-byte buffer. An IPv4 internet protocol address.
++///
++typedef struct {
++  UINT8 Addr[4];
++} IPv4_ADDRESS;
++
++///
++/// 16-byte buffer. An IPv6 internet protocol address.
++///
++typedef struct {
++  UINT8 Addr[16];
++} IPv6_ADDRESS;
++
++//
++// 8-bytes unsigned value that represents a physical system address.
++//
++typedef UINT64 PHYSICAL_ADDRESS;
++
++///
++/// LIST_ENTRY structure definition.
++///
++typedef struct _LIST_ENTRY LIST_ENTRY;
++
++///
++/// _LIST_ENTRY structure definition.
++///
++struct _LIST_ENTRY {
++  LIST_ENTRY  *ForwardLink;
++  LIST_ENTRY  *BackLink;
++};
++
++//
++// Modifiers to abstract standard types to aid in debug of problems
++//
++
++///
++/// Datum is read-only.
++///
++#define CONST     const
++
++///
++/// Datum is scoped to the current file or function.
++///
++#define STATIC    static
++
++///
++/// Undeclared type.
++///
++#define VOID      void
++
++//
++// Modifiers for Data Types used to self document code.
++// This concept is borrowed for UEFI specification.
++//
++
++///
++/// Datum is passed to the function.
++///
++#define IN
++
++///
++/// Datum is returned from the function.
++///
++#define OUT
++
++///
++/// Passing the datum to the function is optional, and a NULL
++/// is passed if the value is not supplied.
++///
++#define OPTIONAL
++
++//
++//  UEFI specification claims 1 and 0. We are concerned about the
++//  compiler portability so we did it this way.
++//
++
++///
++/// Boolean true value.  UEFI Specification defines this value to be 1,
++/// but this form is more portable.
++///
++#define TRUE  ((BOOLEAN)(1==1))
++
++///
++/// Boolean false value.  UEFI Specification defines this value to be 0,
++/// but this form is more portable.
++///
++#define FALSE ((BOOLEAN)(0==1))
++
++///
++/// NULL pointer (VOID *)
++///
++#ifndef NULL
++  #define NULL  ((VOID *) 0)
++#endif
++
++//
++// Null character
++//
++#define CHAR_NULL             0x0000
++
++///
++/// Maximum values for common UEFI Data Types
++///
++#define MAX_INT8    ((INT8)0x7F)
++#define MAX_UINT8   ((UINT8)0xFF)
++#define MAX_INT16   ((INT16)0x7FFF)
++#define MAX_UINT16  ((UINT16)0xFFFF)
++#define MAX_INT32   ((INT32)0x7FFFFFFF)
++#define MAX_UINT32  ((UINT32)0xFFFFFFFF)
++#define MAX_INT64   ((INT64)0x7FFFFFFFFFFFFFFFULL)
++#define MAX_UINT64  ((UINT64)0xFFFFFFFFFFFFFFFFULL)
++
++///
++/// Minimum values for the signed UEFI Data Types
++///
++#define MIN_INT8   (((INT8)  -127) - 1)
++#define MIN_INT16  (((INT16) -32767) - 1)
++#define MIN_INT32  (((INT32) -2147483647) - 1)
++#define MIN_INT64  (((INT64) -9223372036854775807LL) - 1)
++
++#define  BIT0     0x00000001
++#define  BIT1     0x00000002
++#define  BIT2     0x00000004
++#define  BIT3     0x00000008
++#define  BIT4     0x00000010
++#define  BIT5     0x00000020
++#define  BIT6     0x00000040
++#define  BIT7     0x00000080
++#define  BIT8     0x00000100
++#define  BIT9     0x00000200
++#define  BIT10    0x00000400
++#define  BIT11    0x00000800
++#define  BIT12    0x00001000
++#define  BIT13    0x00002000
++#define  BIT14    0x00004000
++#define  BIT15    0x00008000
++#define  BIT16    0x00010000
++#define  BIT17    0x00020000
++#define  BIT18    0x00040000
++#define  BIT19    0x00080000
++#define  BIT20    0x00100000
++#define  BIT21    0x00200000
++#define  BIT22    0x00400000
++#define  BIT23    0x00800000
++#define  BIT24    0x01000000
++#define  BIT25    0x02000000
++#define  BIT26    0x04000000
++#define  BIT27    0x08000000
++#define  BIT28    0x10000000
++#define  BIT29    0x20000000
++#define  BIT30    0x40000000
++#define  BIT31    0x80000000
++#define  BIT32    0x0000000100000000ULL
++#define  BIT33    0x0000000200000000ULL
++#define  BIT34    0x0000000400000000ULL
++#define  BIT35    0x0000000800000000ULL
++#define  BIT36    0x0000001000000000ULL
++#define  BIT37    0x0000002000000000ULL
++#define  BIT38    0x0000004000000000ULL
++#define  BIT39    0x0000008000000000ULL
++#define  BIT40    0x0000010000000000ULL
++#define  BIT41    0x0000020000000000ULL
++#define  BIT42    0x0000040000000000ULL
++#define  BIT43    0x0000080000000000ULL
++#define  BIT44    0x0000100000000000ULL
++#define  BIT45    0x0000200000000000ULL
++#define  BIT46    0x0000400000000000ULL
++#define  BIT47    0x0000800000000000ULL
++#define  BIT48    0x0001000000000000ULL
++#define  BIT49    0x0002000000000000ULL
++#define  BIT50    0x0004000000000000ULL
++#define  BIT51    0x0008000000000000ULL
++#define  BIT52    0x0010000000000000ULL
++#define  BIT53    0x0020000000000000ULL
++#define  BIT54    0x0040000000000000ULL
++#define  BIT55    0x0080000000000000ULL
++#define  BIT56    0x0100000000000000ULL
++#define  BIT57    0x0200000000000000ULL
++#define  BIT58    0x0400000000000000ULL
++#define  BIT59    0x0800000000000000ULL
++#define  BIT60    0x1000000000000000ULL
++#define  BIT61    0x2000000000000000ULL
++#define  BIT62    0x4000000000000000ULL
++#define  BIT63    0x8000000000000000ULL
++
++#define  SIZE_1KB    0x00000400
++#define  SIZE_2KB    0x00000800
++#define  SIZE_4KB    0x00001000
++#define  SIZE_8KB    0x00002000
++#define  SIZE_16KB   0x00004000
++#define  SIZE_32KB   0x00008000
++#define  SIZE_64KB   0x00010000
++#define  SIZE_128KB  0x00020000
++#define  SIZE_256KB  0x00040000
++#define  SIZE_512KB  0x00080000
++#define  SIZE_1MB    0x00100000
++#define  SIZE_2MB    0x00200000
++#define  SIZE_4MB    0x00400000
++#define  SIZE_8MB    0x00800000
++#define  SIZE_16MB   0x01000000
++#define  SIZE_32MB   0x02000000
++#define  SIZE_64MB   0x04000000
++#define  SIZE_128MB  0x08000000
++#define  SIZE_256MB  0x10000000
++#define  SIZE_512MB  0x20000000
++#define  SIZE_1GB    0x40000000
++#define  SIZE_2GB    0x80000000
++#define  SIZE_4GB    0x0000000100000000ULL
++#define  SIZE_8GB    0x0000000200000000ULL
++#define  SIZE_16GB   0x0000000400000000ULL
++#define  SIZE_32GB   0x0000000800000000ULL
++#define  SIZE_64GB   0x0000001000000000ULL
++#define  SIZE_128GB  0x0000002000000000ULL
++#define  SIZE_256GB  0x0000004000000000ULL
++#define  SIZE_512GB  0x0000008000000000ULL
++#define  SIZE_1TB    0x0000010000000000ULL
++#define  SIZE_2TB    0x0000020000000000ULL
++#define  SIZE_4TB    0x0000040000000000ULL
++#define  SIZE_8TB    0x0000080000000000ULL
++#define  SIZE_16TB   0x0000100000000000ULL
++#define  SIZE_32TB   0x0000200000000000ULL
++#define  SIZE_64TB   0x0000400000000000ULL
++#define  SIZE_128TB  0x0000800000000000ULL
++#define  SIZE_256TB  0x0001000000000000ULL
++#define  SIZE_512TB  0x0002000000000000ULL
++#define  SIZE_1PB    0x0004000000000000ULL
++#define  SIZE_2PB    0x0008000000000000ULL
++#define  SIZE_4PB    0x0010000000000000ULL
++#define  SIZE_8PB    0x0020000000000000ULL
++#define  SIZE_16PB   0x0040000000000000ULL
++#define  SIZE_32PB   0x0080000000000000ULL
++#define  SIZE_64PB   0x0100000000000000ULL
++#define  SIZE_128PB  0x0200000000000000ULL
++#define  SIZE_256PB  0x0400000000000000ULL
++#define  SIZE_512PB  0x0800000000000000ULL
++#define  SIZE_1EB    0x1000000000000000ULL
++#define  SIZE_2EB    0x2000000000000000ULL
++#define  SIZE_4EB    0x4000000000000000ULL
++#define  SIZE_8EB    0x8000000000000000ULL
++
++#define  BASE_1KB    0x00000400
++#define  BASE_2KB    0x00000800
++#define  BASE_4KB    0x00001000
++#define  BASE_8KB    0x00002000
++#define  BASE_16KB   0x00004000
++#define  BASE_32KB   0x00008000
++#define  BASE_64KB   0x00010000
++#define  BASE_128KB  0x00020000
++#define  BASE_256KB  0x00040000
++#define  BASE_512KB  0x00080000
++#define  BASE_1MB    0x00100000
++#define  BASE_2MB    0x00200000
++#define  BASE_4MB    0x00400000
++#define  BASE_8MB    0x00800000
++#define  BASE_16MB   0x01000000
++#define  BASE_32MB   0x02000000
++#define  BASE_64MB   0x04000000
++#define  BASE_128MB  0x08000000
++#define  BASE_256MB  0x10000000
++#define  BASE_512MB  0x20000000
++#define  BASE_1GB    0x40000000
++#define  BASE_2GB    0x80000000
++#define  BASE_4GB    0x0000000100000000ULL
++#define  BASE_8GB    0x0000000200000000ULL
++#define  BASE_16GB   0x0000000400000000ULL
++#define  BASE_32GB   0x0000000800000000ULL
++#define  BASE_64GB   0x0000001000000000ULL
++#define  BASE_128GB  0x0000002000000000ULL
++#define  BASE_256GB  0x0000004000000000ULL
++#define  BASE_512GB  0x0000008000000000ULL
++#define  BASE_1TB    0x0000010000000000ULL
++#define  BASE_2TB    0x0000020000000000ULL
++#define  BASE_4TB    0x0000040000000000ULL
++#define  BASE_8TB    0x0000080000000000ULL
++#define  BASE_16TB   0x0000100000000000ULL
++#define  BASE_32TB   0x0000200000000000ULL
++#define  BASE_64TB   0x0000400000000000ULL
++#define  BASE_128TB  0x0000800000000000ULL
++#define  BASE_256TB  0x0001000000000000ULL
++#define  BASE_512TB  0x0002000000000000ULL
++#define  BASE_1PB    0x0004000000000000ULL
++#define  BASE_2PB    0x0008000000000000ULL
++#define  BASE_4PB    0x0010000000000000ULL
++#define  BASE_8PB    0x0020000000000000ULL
++#define  BASE_16PB   0x0040000000000000ULL
++#define  BASE_32PB   0x0080000000000000ULL
++#define  BASE_64PB   0x0100000000000000ULL
++#define  BASE_128PB  0x0200000000000000ULL
++#define  BASE_256PB  0x0400000000000000ULL
++#define  BASE_512PB  0x0800000000000000ULL
++#define  BASE_1EB    0x1000000000000000ULL
++#define  BASE_2EB    0x2000000000000000ULL
++#define  BASE_4EB    0x4000000000000000ULL
++#define  BASE_8EB    0x8000000000000000ULL
++
++//
++//  Support for variable argument lists in freestanding edk2 modules.
++//
++//  For modules that use the ISO C library interfaces for variable
++//  argument lists, refer to "StdLib/Include/stdarg.h".
++//
++//  VA_LIST  - typedef for argument list.
++//  VA_START (VA_LIST Marker, argument before the ...) - Init Marker for use.
++//  VA_END (VA_LIST Marker) - Clear Marker
++//  VA_ARG (VA_LIST Marker, var arg type) - Use Marker to get an argument from
++//    the ... list. You must know the type and pass it in this macro.  Type
++//    must be compatible with the type of the actual next argument (as promoted
++//    according to the default argument promotions.)
++//  VA_COPY (VA_LIST Dest, VA_LIST Start) - Initialize Dest as a copy of Start.
++//
++//  Example:
++//
++//  UINTN
++//  EFIAPI
++//  ExampleVarArg (
++//    IN UINTN  NumberOfArgs,
++//    ...
++//    )
++//  {
++//    VA_LIST Marker;
++//    UINTN   Index;
++//    UINTN   Result;
++//
++//    //
++//    // Initialize the Marker
++//    //
++//    VA_START (Marker, NumberOfArgs);
++//    for (Index = 0, Result = 0; Index < NumberOfArgs; Index++) {
++//      //
++//      // The ... list is a series of UINTN values, so sum them up.
++//      //
++//      Result += VA_ARG (Marker, UINTN);
++//    }
++//
++//    VA_END (Marker);
++//    return Result;
++//  }
++//
++//  Notes:
++//  - Functions that call VA_START() / VA_END() must have a variable
++//    argument list and must be declared EFIAPI.
++//  - Functions that call VA_COPY() / VA_END() must be declared EFIAPI.
++//  - Functions that only use VA_LIST and VA_ARG() need not be EFIAPI.
++//
++
++/**
++  Return the size of argument that has been aligned to sizeof (UINTN).
++
++  @param  n    The parameter size to be aligned.
++
++  @return The aligned size.
++**/
++#define _INT_SIZE_OF(n) ((sizeof (n) + sizeof (UINTN) - 1) &~(sizeof (UINTN) - 1))
++
++#if defined(__CC_ARM)
++//
++// RVCT ARM variable argument list support.
++//
++
++///
++/// Variable used to traverse the list of arguments. This type can vary by
++/// implementation and could be an array or structure.
++///
++#ifdef __APCS_ADSABI
++  typedef int         *va_list[1];
++  #define VA_LIST     va_list
++#else
++  typedef struct __va_list { void *__ap; } va_list;
++  #define VA_LIST                          va_list
++#endif
++
++#define VA_START(Marker, Parameter)   __va_start(Marker, Parameter)
++
++#define VA_ARG(Marker, TYPE)          __va_arg(Marker, TYPE)
++
++#define VA_END(Marker)                ((void)0)
++
++// For some ARM RVCT compilers, __va_copy is not defined
++#ifndef __va_copy
++  #define __va_copy(dest, src) ((void)((dest) = (src)))
++#endif
++
++#define VA_COPY(Dest, Start)          __va_copy (Dest, Start)
++
++#elif defined(_M_ARM) || defined(_M_ARM64)
++//
++// MSFT ARM variable argument list support.
++//
++
++typedef char* VA_LIST;
++
++#define VA_START(Marker, Parameter)     __va_start (&Marker, &Parameter, _INT_SIZE_OF (Parameter), __alignof(Parameter), &Parameter)
++#define VA_ARG(Marker, TYPE)            (*(TYPE *) ((Marker += _INT_SIZE_OF (TYPE) + ((-(INTN)Marker) & (sizeof(TYPE) - 1))) - _INT_SIZE_OF (TYPE)))
++#define VA_END(Marker)                  (Marker = (VA_LIST) 0)
++#define VA_COPY(Dest, Start)            ((void)((Dest) = (Start)))
++
++#elif defined(__GNUC__) || defined(__clang__)
++
++#if defined(MDE_CPU_X64) && !defined(NO_MSABI_VA_FUNCS) && !defined(__clang__)
++//
++// X64 only. Use MS ABI version of GCC built-in macros for variable argument lists.
++//
++///
++/// Both GCC and LLVM 3.8 for X64 support new variable argument intrinsics for Microsoft ABI
++///
++
++///
++/// Variable used to traverse the list of arguments. This type can vary by
++/// implementation and could be an array or structure.
++///
++typedef __builtin_ms_va_list VA_LIST;
++
++#define VA_START(Marker, Parameter)  __builtin_ms_va_start (Marker, Parameter)
++
++#define VA_ARG(Marker, TYPE)         ((sizeof (TYPE) < sizeof (UINTN)) ? (TYPE)(__builtin_va_arg (Marker, UINTN)) : (TYPE)(__builtin_va_arg (Marker, TYPE)))
++
++#define VA_END(Marker)               __builtin_ms_va_end (Marker)
++
++#define VA_COPY(Dest, Start)         __builtin_ms_va_copy (Dest, Start)
++
++#else
++//
++// Use GCC built-in macros for variable argument lists.
++//
++
++///
++/// Variable used to traverse the list of arguments. This type can vary by
++/// implementation and could be an array or structure.
++///
++typedef __builtin_va_list VA_LIST;
++
++#define VA_START(Marker, Parameter)  __builtin_va_start (Marker, Parameter)
++
++#define VA_ARG(Marker, TYPE)         ((sizeof (TYPE) < sizeof (UINTN)) ? (TYPE)(__builtin_va_arg (Marker, UINTN)) : (TYPE)(__builtin_va_arg (Marker, TYPE)))
++
++#define VA_END(Marker)               __builtin_va_end (Marker)
++
++#define VA_COPY(Dest, Start)         __builtin_va_copy (Dest, Start)
++
++#endif
++
++#else
++///
++/// Variable used to traverse the list of arguments. This type can vary by
++/// implementation and could be an array or structure.
++///
++typedef CHAR8 *VA_LIST;
++
++/**
++  Retrieves a pointer to the beginning of a variable argument list, based on
++  the name of the parameter that immediately precedes the variable argument list.
++
++  This function initializes Marker to point to the beginning of the variable
++  argument list that immediately follows Parameter.  The method for computing the
++  pointer to the next argument in the argument list is CPU-specific following the
++  EFIAPI ABI.
++
++  @param   Marker       The VA_LIST used to traverse the list of arguments.
++  @param   Parameter    The name of the parameter that immediately precedes
++                        the variable argument list.
++
++  @return  A pointer to the beginning of a variable argument list.
++
++**/
++#define VA_START(Marker, Parameter) (Marker = (VA_LIST) ((UINTN) & (Parameter) + _INT_SIZE_OF (Parameter)))
++
++/**
++  Returns an argument of a specified type from a variable argument list and updates
++  the pointer to the variable argument list to point to the next argument.
++
++  This function returns an argument of the type specified by TYPE from the beginning
++  of the variable argument list specified by Marker.  Marker is then updated to point
++  to the next argument in the variable argument list.  The method for computing the
++  pointer to the next argument in the argument list is CPU-specific following the EFIAPI ABI.
++
++  @param   Marker   VA_LIST used to traverse the list of arguments.
++  @param   TYPE     The type of argument to retrieve from the beginning
++                    of the variable argument list.
++
++  @return  An argument of the type specified by TYPE.
++
++**/
++#define VA_ARG(Marker, TYPE)   (*(TYPE *) ((Marker += _INT_SIZE_OF (TYPE)) - _INT_SIZE_OF (TYPE)))
++
++/**
++  Terminates the use of a variable argument list.
++
++  This function initializes Marker so it can no longer be used with VA_ARG().
++  After this macro is used, the only way to access the variable argument list is
++  by using VA_START() again.
++
++  @param   Marker   VA_LIST used to traverse the list of arguments.
++
++**/
++#define VA_END(Marker)      (Marker = (VA_LIST) 0)
++
++/**
++  Initializes a VA_LIST as a copy of an existing VA_LIST.
++
++  This macro initializes Dest as a copy of Start, as if the VA_START macro had been applied to Dest
++  followed by the same sequence of uses of the VA_ARG macro as had previously been used to reach
++  the present state of Start.
++
++  @param   Dest   VA_LIST used to traverse the list of arguments.
++  @param   Start  VA_LIST used to traverse the list of arguments.
++
++**/
++#define VA_COPY(Dest, Start)  ((void)((Dest) = (Start)))
++
++#endif
++
++///
++/// Pointer to the start of a variable argument list stored in a memory buffer. Same as UINT8 *.
++///
++typedef UINTN  *BASE_LIST;
++
++/**
++  Returns the size of a data type in sizeof(UINTN) units rounded up to the nearest UINTN boundary.
++
++  @param  TYPE  The date type to determine the size of.
++
++  @return The size of TYPE in sizeof (UINTN) units rounded up to the nearest UINTN boundary.
++**/
++#define _BASE_INT_SIZE_OF(TYPE) ((sizeof (TYPE) + sizeof (UINTN) - 1) / sizeof (UINTN))
++
++/**
++  Returns an argument of a specified type from a variable argument list and updates
++  the pointer to the variable argument list to point to the next argument.
++
++  This function returns an argument of the type specified by TYPE from the beginning
++  of the variable argument list specified by Marker.  Marker is then updated to point
++  to the next argument in the variable argument list.  The method for computing the
++  pointer to the next argument in the argument list is CPU specific following the EFIAPI ABI.
++
++  @param   Marker   The pointer to the beginning of a variable argument list.
++  @param   TYPE     The type of argument to retrieve from the beginning
++                    of the variable argument list.
++
++  @return  An argument of the type specified by TYPE.
++
++**/
++#define BASE_ARG(Marker, TYPE)   (*(TYPE *) ((Marker += _BASE_INT_SIZE_OF (TYPE)) - _BASE_INT_SIZE_OF (TYPE)))
++
++/**
++  The macro that returns the byte offset of a field in a data structure.
++
++  This function returns the offset, in bytes, of field specified by Field from the
++  beginning of the  data structure specified by TYPE. If TYPE does not contain Field,
++  the module will not compile.
++
++  @param   TYPE     The name of the data structure that contains the field specified by Field.
++  @param   Field    The name of the field in the data structure.
++
++  @return  Offset, in bytes, of field.
++
++**/
++#ifdef __GNUC__
++#if __GNUC__ >= 4
++#define OFFSET_OF(TYPE, Field) ((UINTN) __builtin_offsetof(TYPE, Field))
++#endif
++#endif
++
++#ifndef OFFSET_OF
++#define OFFSET_OF(TYPE, Field) ((UINTN) &(((TYPE *)0)->Field))
++#endif
++
++/**
++  Portable definition for compile time assertions.
++  Equivalent to C11 static_assert macro from assert.h.
++
++  @param  Expression  Boolean expression.
++  @param  Message     Raised compiler diagnostic message when expression is false.
++
++**/
++#ifdef MDE_CPU_EBC
++  #define STATIC_ASSERT(Expression, Message)
++#elif _MSC_EXTENSIONS
++  #define STATIC_ASSERT static_assert
++#else
++  #define STATIC_ASSERT _Static_assert
++#endif
++
++//
++// Verify that ProcessorBind.h produced UEFI Data Types that are compliant with
++// Section 2.3.1 of the UEFI 2.3 Specification.
++//
++
++STATIC_ASSERT (sizeof (BOOLEAN) == 1, "sizeof (BOOLEAN) does not meet UEFI Specification Data Type requirements");
++STATIC_ASSERT (sizeof (INT8)    == 1, "sizeof (INT8) does not meet UEFI Specification Data Type requirements");
++STATIC_ASSERT (sizeof (UINT8)   == 1, "sizeof (UINT8) does not meet UEFI Specification Data Type requirements");
++STATIC_ASSERT (sizeof (INT16)   == 2, "sizeof (INT16) does not meet UEFI Specification Data Type requirements");
++STATIC_ASSERT (sizeof (UINT16)  == 2, "sizeof (UINT16) does not meet UEFI Specification Data Type requirements");
++STATIC_ASSERT (sizeof (INT32)   == 4, "sizeof (INT32) does not meet UEFI Specification Data Type requirements");
++STATIC_ASSERT (sizeof (UINT32)  == 4, "sizeof (UINT32) does not meet UEFI Specification Data Type requirements");
++STATIC_ASSERT (sizeof (INT64)   == 8, "sizeof (INT64) does not meet UEFI Specification Data Type requirements");
++STATIC_ASSERT (sizeof (UINT64)  == 8, "sizeof (UINT64) does not meet UEFI Specification Data Type requirements");
++STATIC_ASSERT (sizeof (CHAR8)   == 1, "sizeof (CHAR8) does not meet UEFI Specification Data Type requirements");
++STATIC_ASSERT (sizeof (CHAR16)  == 2, "sizeof (CHAR16) does not meet UEFI Specification Data Type requirements");
++
++//
++// The following three enum types are used to verify that the compiler
++// configuration for enum types is compliant with Section 2.3.1 of the
++// UEFI 2.3 Specification. These enum types and enum values are not
++// intended to be used. A prefix of '__' is used avoid conflicts with
++// other types.
++//
++typedef enum {
++  __VerifyUint8EnumValue = 0xff
++} __VERIFY_UINT8_ENUM_SIZE;
++
++typedef enum {
++  __VerifyUint16EnumValue = 0xffff
++} __VERIFY_UINT16_ENUM_SIZE;
++
++typedef enum {
++  __VerifyUint32EnumValue = 0xffffffff
++} __VERIFY_UINT32_ENUM_SIZE;
++
++STATIC_ASSERT (sizeof (__VERIFY_UINT8_ENUM_SIZE) == 4, "Size of enum does not meet UEFI Specification Data Type requirements");
++STATIC_ASSERT (sizeof (__VERIFY_UINT16_ENUM_SIZE) == 4, "Size of enum does not meet UEFI Specification Data Type requirements");
++STATIC_ASSERT (sizeof (__VERIFY_UINT32_ENUM_SIZE) == 4, "Size of enum does not meet UEFI Specification Data Type requirements");
++
++/**
++  Macro that returns a pointer to the data structure that contains a specified field of
++  that data structure.  This is a lightweight method to hide information by placing a
++  public data structure inside a larger private data structure and using a pointer to
++  the public data structure to retrieve a pointer to the private data structure.
++
++  This function computes the offset, in bytes, of field specified by Field from the beginning
++  of the  data structure specified by TYPE.  This offset is subtracted from Record, and is
++  used to return a pointer to a data structure of the type specified by TYPE. If the data type
++  specified by TYPE does not contain the field specified by Field, then the module will not compile.
++
++  @param   Record   Pointer to the field specified by Field within a data structure of type TYPE.
++  @param   TYPE     The name of the data structure type to return.  This data structure must
++                    contain the field specified by Field.
++  @param   Field    The name of the field in the data structure specified by TYPE to which Record points.
++
++  @return  A pointer to the structure from one of it's elements.
++
++**/
++#define BASE_CR(Record, TYPE, Field)  ((TYPE *) ((CHAR8 *) (Record) - OFFSET_OF (TYPE, Field)))
++
++/**
++  Rounds a value up to the next boundary using a specified alignment.
++
++  This function rounds Value up to the next boundary using the specified Alignment.
++  This aligned value is returned.
++
++  @param   Value      The value to round up.
++  @param   Alignment  The alignment boundary used to return the aligned value.
++
++  @return  A value up to the next boundary.
++
++**/
++#define ALIGN_VALUE(Value, Alignment) ((Value) + (((Alignment) - (Value)) & ((Alignment) - 1)))
++
++/**
++  Adjust a pointer by adding the minimum offset required for it to be aligned on
++  a specified alignment boundary.
++
++  This function rounds the pointer specified by Pointer to the next alignment boundary
++  specified by Alignment. The pointer to the aligned address is returned.
++
++  @param   Pointer    The pointer to round up.
++  @param   Alignment  The alignment boundary to use to return an aligned pointer.
++
++  @return  Pointer to the aligned address.
++
++**/
++#define ALIGN_POINTER(Pointer, Alignment) ((VOID *) (ALIGN_VALUE ((UINTN)(Pointer), (Alignment))))
++
++/**
++  Rounds a value up to the next natural boundary for the current CPU.
++  This is 4-bytes for 32-bit CPUs and 8-bytes for 64-bit CPUs.
++
++  This function rounds the value specified by Value up to the next natural boundary for the
++  current CPU. This rounded value is returned.
++
++  @param   Value      The value to round up.
++
++  @return  Rounded value specified by Value.
++
++**/
++#define ALIGN_VARIABLE(Value)  ALIGN_VALUE ((Value), sizeof (UINTN))
++
++
++/**
++  Return the maximum of two operands.
++
++  This macro returns the maximum of two operand specified by a and b.
++  Both a and b must be the same numerical types, signed or unsigned.
++
++  @param   a        The first operand with any numerical type.
++  @param   b        The second operand. Can be any numerical type as long as is
++                    the same type as a.
++
++  @return  Maximum of two operands.
++
++**/
++#define MAX(a, b)                       \
++  (((a) > (b)) ? (a) : (b))
++
++/**
++  Return the minimum of two operands.
++
++  This macro returns the minimal of two operand specified by a and b.
++  Both a and b must be the same numerical types, signed or unsigned.
++
++  @param   a        The first operand with any numerical type.
++  @param   b        The second operand. It should be the same any numerical type with a.
++
++  @return  Minimum of two operands.
++
++**/
++#define MIN(a, b)                       \
++  (((a) < (b)) ? (a) : (b))
++
++/**
++  Return the absolute value of a signed operand.
++
++  This macro returns the absolute value of the signed operand specified by a.
++
++  @param   a        The signed operand.
++
++  @return  The absolute value of the signed operand.
++
++**/
++#define ABS(a)                          \
++  (((a) < 0) ? (-(a)) : (a))
++
++//
++// Status codes common to all execution phases
++//
++typedef UINTN RETURN_STATUS;
++
++/**
++  Produces a RETURN_STATUS code with the highest bit set.
++
++  @param  StatusCode    The status code value to convert into a warning code.
++                        StatusCode must be in the range 0x00000000..0x7FFFFFFF.
++
++  @return The value specified by StatusCode with the highest bit set.
++
++**/
++#define ENCODE_ERROR(StatusCode)     ((RETURN_STATUS)(MAX_BIT | (StatusCode)))
++
++/**
++  Produces a RETURN_STATUS code with the highest bit clear.
++
++  @param  StatusCode    The status code value to convert into a warning code.
++                        StatusCode must be in the range 0x00000000..0x7FFFFFFF.
++
++  @return The value specified by StatusCode with the highest bit clear.
++
++**/
++#define ENCODE_WARNING(StatusCode)   ((RETURN_STATUS)(StatusCode))
++
++/**
++  Returns TRUE if a specified RETURN_STATUS code is an error code.
++
++  This function returns TRUE if StatusCode has the high bit set.  Otherwise, FALSE is returned.
++
++  @param  StatusCode    The status code value to evaluate.
++
++  @retval TRUE          The high bit of StatusCode is set.
++  @retval FALSE         The high bit of StatusCode is clear.
++
++**/
++#define RETURN_ERROR(StatusCode)     (((INTN)(RETURN_STATUS)(StatusCode)) < 0)
++
++///
++/// The operation completed successfully.
++///
++#define RETURN_SUCCESS               0
++
++///
++/// The image failed to load.
++///
++#define RETURN_LOAD_ERROR            ENCODE_ERROR (1)
++
++///
++/// The parameter was incorrect.
++///
++#define RETURN_INVALID_PARAMETER     ENCODE_ERROR (2)
++
++///
++/// The operation is not supported.
++///
++#define RETURN_UNSUPPORTED           ENCODE_ERROR (3)
++
++///
++/// The buffer was not the proper size for the request.
++///
++#define RETURN_BAD_BUFFER_SIZE       ENCODE_ERROR (4)
++
++///
++/// The buffer was not large enough to hold the requested data.
++/// The required buffer size is returned in the appropriate
++/// parameter when this error occurs.
++///
++#define RETURN_BUFFER_TOO_SMALL      ENCODE_ERROR (5)
++
++///
++/// There is no data pending upon return.
++///
++#define RETURN_NOT_READY             ENCODE_ERROR (6)
++
++///
++/// The physical device reported an error while attempting the
++/// operation.
++///
++#define RETURN_DEVICE_ERROR          ENCODE_ERROR (7)
++
++///
++/// The device can not be written to.
++///
++#define RETURN_WRITE_PROTECTED       ENCODE_ERROR (8)
++
++///
++/// The resource has run out.
++///
++#define RETURN_OUT_OF_RESOURCES      ENCODE_ERROR (9)
++
++///
++/// An inconsistency was detected on the file system causing the
++/// operation to fail.
++///
++#define RETURN_VOLUME_CORRUPTED      ENCODE_ERROR (10)
++
++///
++/// There is no more space on the file system.
++///
++#define RETURN_VOLUME_FULL           ENCODE_ERROR (11)
++
++///
++/// The device does not contain any medium to perform the
++/// operation.
++///
++#define RETURN_NO_MEDIA              ENCODE_ERROR (12)
++
++///
++/// The medium in the device has changed since the last
++/// access.
++///
++#define RETURN_MEDIA_CHANGED         ENCODE_ERROR (13)
++
++///
++/// The item was not found.
++///
++#define RETURN_NOT_FOUND             ENCODE_ERROR (14)
++
++///
++/// Access was denied.
++///
++#define RETURN_ACCESS_DENIED         ENCODE_ERROR (15)
++
++///
++/// The server was not found or did not respond to the request.
++///
++#define RETURN_NO_RESPONSE           ENCODE_ERROR (16)
++
++///
++/// A mapping to the device does not exist.
++///
++#define RETURN_NO_MAPPING            ENCODE_ERROR (17)
++
++///
++/// A timeout time expired.
++///
++#define RETURN_TIMEOUT               ENCODE_ERROR (18)
++
++///
++/// The protocol has not been started.
++///
++#define RETURN_NOT_STARTED           ENCODE_ERROR (19)
++
++///
++/// The protocol has already been started.
++///
++#define RETURN_ALREADY_STARTED       ENCODE_ERROR (20)
++
++///
++/// The operation was aborted.
++///
++#define RETURN_ABORTED               ENCODE_ERROR (21)
++
++///
++/// An ICMP error occurred during the network operation.
++///
++#define RETURN_ICMP_ERROR            ENCODE_ERROR (22)
++
++///
++/// A TFTP error occurred during the network operation.
++///
++#define RETURN_TFTP_ERROR            ENCODE_ERROR (23)
++
++///
++/// A protocol error occurred during the network operation.
++///
++#define RETURN_PROTOCOL_ERROR        ENCODE_ERROR (24)
++
++///
++/// A function encountered an internal version that was
++/// incompatible with a version requested by the caller.
++///
++#define RETURN_INCOMPATIBLE_VERSION  ENCODE_ERROR (25)
++
++///
++/// The function was not performed due to a security violation.
++///
++#define RETURN_SECURITY_VIOLATION    ENCODE_ERROR (26)
++
++///
++/// A CRC error was detected.
++///
++#define RETURN_CRC_ERROR             ENCODE_ERROR (27)
++
++///
++/// The beginning or end of media was reached.
++///
++#define RETURN_END_OF_MEDIA          ENCODE_ERROR (28)
++
++///
++/// The end of the file was reached.
++///
++#define RETURN_END_OF_FILE           ENCODE_ERROR (31)
++
++///
++/// The language specified was invalid.
++///
++#define RETURN_INVALID_LANGUAGE      ENCODE_ERROR (32)
++
++///
++/// The security status of the data is unknown or compromised
++/// and the data must be updated or replaced to restore a valid
++/// security status.
++///
++#define RETURN_COMPROMISED_DATA      ENCODE_ERROR (33)
++
++///
++/// A HTTP error occurred during the network operation.
++///
++#define RETURN_HTTP_ERROR            ENCODE_ERROR (35)
++
++///
++/// The string contained one or more characters that
++/// the device could not render and were skipped.
++///
++#define RETURN_WARN_UNKNOWN_GLYPH    ENCODE_WARNING (1)
++
++///
++/// The handle was closed, but the file was not deleted.
++///
++#define RETURN_WARN_DELETE_FAILURE   ENCODE_WARNING (2)
++
++///
++/// The handle was closed, but the data to the file was not
++/// flushed properly.
++///
++#define RETURN_WARN_WRITE_FAILURE    ENCODE_WARNING (3)
++
++///
++/// The resulting buffer was too small, and the data was
++/// truncated to the buffer size.
++///
++#define RETURN_WARN_BUFFER_TOO_SMALL ENCODE_WARNING (4)
++
++///
++/// The data has not been updated within the timeframe set by
++/// local policy for this type of data.
++///
++#define RETURN_WARN_STALE_DATA       ENCODE_WARNING (5)
++
++///
++/// The resulting buffer contains UEFI-compliant file system.
++///
++#define RETURN_WARN_FILE_SYSTEM      ENCODE_WARNING (6)
++
++
++/**
++  Returns a 16-bit signature built from 2 ASCII characters.
++
++  This macro returns a 16-bit value built from the two ASCII characters specified
++  by A and B.
++
++  @param  A    The first ASCII character.
++  @param  B    The second ASCII character.
++
++  @return A 16-bit value built from the two ASCII characters specified by A and B.
++
++**/
++#define SIGNATURE_16(A, B)        ((A) | (B << 8))
++
++/**
++  Returns a 32-bit signature built from 4 ASCII characters.
++
++  This macro returns a 32-bit value built from the four ASCII characters specified
++  by A, B, C, and D.
++
++  @param  A    The first ASCII character.
++  @param  B    The second ASCII character.
++  @param  C    The third ASCII character.
++  @param  D    The fourth ASCII character.
++
++  @return A 32-bit value built from the two ASCII characters specified by A, B,
++          C and D.
++
++**/
++#define SIGNATURE_32(A, B, C, D)  (SIGNATURE_16 (A, B) | (SIGNATURE_16 (C, D) << 16))
++
++/**
++  Returns a 64-bit signature built from 8 ASCII characters.
++
++  This macro returns a 64-bit value built from the eight ASCII characters specified
++  by A, B, C, D, E, F, G,and H.
++
++  @param  A    The first ASCII character.
++  @param  B    The second ASCII character.
++  @param  C    The third ASCII character.
++  @param  D    The fourth ASCII character.
++  @param  E    The fifth ASCII character.
++  @param  F    The sixth ASCII character.
++  @param  G    The seventh ASCII character.
++  @param  H    The eighth ASCII character.
++
++  @return A 64-bit value built from the two ASCII characters specified by A, B,
++          C, D, E, F, G and H.
++
++**/
++#define SIGNATURE_64(A, B, C, D, E, F, G, H) \
++    (SIGNATURE_32 (A, B, C, D) | ((UINT64) (SIGNATURE_32 (E, F, G, H)) << 32))
++
++#if defined(_MSC_EXTENSIONS) && !defined (__INTEL_COMPILER) && !defined (MDE_CPU_EBC)
++  void * _ReturnAddress(void);
++  #pragma intrinsic(_ReturnAddress)
++  /**
++    Get the return address of the calling function.
++
++    Based on intrinsic function _ReturnAddress that provides the address of
++    the instruction in the calling function that will be executed after
++    control returns to the caller.
++
++    @param L    Return Level.
++
++    @return The return address of the calling function or 0 if L != 0.
++
++  **/
++  #define RETURN_ADDRESS(L)     ((L == 0) ? _ReturnAddress() : (VOID *) 0)
++#elif defined (__GNUC__) || defined (__clang__)
++  void * __builtin_return_address (unsigned int level);
++  /**
++    Get the return address of the calling function.
++
++    Based on built-in Function __builtin_return_address that returns
++    the return address of the current function, or of one of its callers.
++
++    @param L    Return Level.
++
++    @return The return address of the calling function.
++
++  **/
++  #define RETURN_ADDRESS(L)     __builtin_return_address (L)
++#else
++  /**
++    Get the return address of the calling function.
++
++    @param L    Return Level.
++
++    @return 0 as compilers don't support this feature.
++
++  **/
++  #define RETURN_ADDRESS(L)     ((VOID *) 0)
++#endif
++
++/**
++  Return the number of elements in an array.
++
++  @param  Array  An object of array type. Array is only used as an argument to
++                 the sizeof operator, therefore Array is never evaluated. The
++                 caller is responsible for ensuring that Array's type is not
++                 incomplete; that is, Array must have known constant size.
++
++  @return The number of elements in Array. The result has type UINTN.
++
++**/
++// #define ARRAY_SIZE(Array) (sizeof (Array) / sizeof ((Array)[0]))
++
++#endif
++
+diff --git a/include/linux/uefi_base_type.h b/include/linux/uefi_base_type.h
+new file mode 100644
+index 0000000..c76a0fd
+--- /dev/null
++++ b/include/linux/uefi_base_type.h
+@@ -0,0 +1,290 @@
++/** @file
++  Defines data types and constants introduced in UEFI.
++
++Copyright (c) 2006 - 2018, Intel Corporation. All rights reserved.<BR>
++Portions copyright (c) 2011 - 2016, ARM Ltd. All rights reserved.<BR>
++
++SPDX-License-Identifier: BSD-2-Clause-Patent
++
++**/
++
++#ifndef __UEFI_BASETYPE_H__
++#define __UEFI_BASETYPE_H__
++
++#include "uefi_base.h"
++
++//
++// Basic data type definitions introduced in UEFI.
++//
++
++///
++/// 128-bit buffer containing a unique identifier value.
++///
++typedef GUID                      EFI_GUID;
++///
++/// Function return status for EFI API.
++///
++typedef RETURN_STATUS             EFI_STATUS;
++///
++/// A collection of related interfaces.
++///
++typedef VOID                      *EFI_HANDLE;
++///
++/// Handle to an event structure.
++///
++typedef VOID                      *EFI_EVENT;
++///
++/// Task priority level.
++///
++typedef UINTN                     EFI_TPL;
++///
++/// Logical block address.
++///
++typedef UINT64                    EFI_LBA;
++
++///
++/// 64-bit physical memory address.
++///
++typedef UINT64                    EFI_PHYSICAL_ADDRESS;
++
++///
++/// 64-bit virtual memory address.
++///
++typedef UINT64                    EFI_VIRTUAL_ADDRESS;
++
++///
++/// EFI Time Abstraction:
++///  Year:       1900 - 9999
++///  Month:      1 - 12
++///  Day:        1 - 31
++///  Hour:       0 - 23
++///  Minute:     0 - 59
++///  Second:     0 - 59
++///  Nanosecond: 0 - 999,999,999
++///  TimeZone:   -1440 to 1440 or 2047
++///
++typedef struct {
++  UINT16  Year;
++  UINT8   Month;
++  UINT8   Day;
++  UINT8   Hour;
++  UINT8   Minute;
++  UINT8   Second;
++  UINT8   Pad1;
++  UINT32  Nanosecond;
++  INT16   TimeZone;
++  UINT8   Daylight;
++  UINT8   Pad2;
++} EFI_TIME;
++
++
++///
++/// 4-byte buffer. An IPv4 internet protocol address.
++///
++typedef IPv4_ADDRESS EFI_IPv4_ADDRESS;
++
++///
++/// 16-byte buffer. An IPv6 internet protocol address.
++///
++typedef IPv6_ADDRESS EFI_IPv6_ADDRESS;
++
++///
++/// 32-byte buffer containing a network Media Access Control address.
++///
++typedef struct {
++  UINT8 Addr[32];
++} EFI_MAC_ADDRESS;
++
++///
++/// 16-byte buffer aligned on a 4-byte boundary.
++/// An IPv4 or IPv6 internet protocol address.
++///
++typedef union {
++  UINT32            Addr[4];
++  EFI_IPv4_ADDRESS  v4;
++  EFI_IPv6_ADDRESS  v6;
++} EFI_IP_ADDRESS;
++
++
++#ifndef EFI_SUCCESS
++///
++/// Enumeration of EFI_STATUS.
++///@{
++#define EFI_SUCCESS               RETURN_SUCCESS
++#define EFI_LOAD_ERROR            RETURN_LOAD_ERROR
++#define EFI_INVALID_PARAMETER     RETURN_INVALID_PARAMETER
++#define EFI_UNSUPPORTED           RETURN_UNSUPPORTED
++#define EFI_BAD_BUFFER_SIZE       RETURN_BAD_BUFFER_SIZE
++#define EFI_BUFFER_TOO_SMALL      RETURN_BUFFER_TOO_SMALL
++#define EFI_NOT_READY             RETURN_NOT_READY
++#define EFI_DEVICE_ERROR          RETURN_DEVICE_ERROR
++#define EFI_WRITE_PROTECTED       RETURN_WRITE_PROTECTED
++#define EFI_OUT_OF_RESOURCES      RETURN_OUT_OF_RESOURCES
++#define EFI_VOLUME_CORRUPTED      RETURN_VOLUME_CORRUPTED
++#define EFI_VOLUME_FULL           RETURN_VOLUME_FULL
++#define EFI_NO_MEDIA              RETURN_NO_MEDIA
++#define EFI_MEDIA_CHANGED         RETURN_MEDIA_CHANGED
++#define EFI_NOT_FOUND             RETURN_NOT_FOUND
++#define EFI_ACCESS_DENIED         RETURN_ACCESS_DENIED
++#define EFI_NO_RESPONSE           RETURN_NO_RESPONSE
++#define EFI_NO_MAPPING            RETURN_NO_MAPPING
++#define EFI_TIMEOUT               RETURN_TIMEOUT
++#define EFI_NOT_STARTED           RETURN_NOT_STARTED
++#define EFI_ALREADY_STARTED       RETURN_ALREADY_STARTED
++#define EFI_ABORTED               RETURN_ABORTED
++#define EFI_ICMP_ERROR            RETURN_ICMP_ERROR
++#define EFI_TFTP_ERROR            RETURN_TFTP_ERROR
++#define EFI_PROTOCOL_ERROR        RETURN_PROTOCOL_ERROR
++#define EFI_INCOMPATIBLE_VERSION  RETURN_INCOMPATIBLE_VERSION
++#define EFI_SECURITY_VIOLATION    RETURN_SECURITY_VIOLATION
++#define EFI_CRC_ERROR             RETURN_CRC_ERROR
++#define EFI_END_OF_MEDIA          RETURN_END_OF_MEDIA
++#define EFI_END_OF_FILE           RETURN_END_OF_FILE
++#define EFI_INVALID_LANGUAGE      RETURN_INVALID_LANGUAGE
++#define EFI_COMPROMISED_DATA      RETURN_COMPROMISED_DATA
++#define EFI_HTTP_ERROR            RETURN_HTTP_ERROR
++
++#define EFI_WARN_UNKNOWN_GLYPH    RETURN_WARN_UNKNOWN_GLYPH
++#define EFI_WARN_DELETE_FAILURE   RETURN_WARN_DELETE_FAILURE
++#define EFI_WARN_WRITE_FAILURE    RETURN_WARN_WRITE_FAILURE
++#define EFI_WARN_BUFFER_TOO_SMALL RETURN_WARN_BUFFER_TOO_SMALL
++#define EFI_WARN_STALE_DATA       RETURN_WARN_STALE_DATA
++#define EFI_WARN_FILE_SYSTEM      RETURN_WARN_FILE_SYSTEM
++///@}
++#endif
++
++///
++/// Define macro to encode the status code.
++///
++#define EFIERR(_a)                ENCODE_ERROR(_a)
++
++#define EFI_ERROR(A)              RETURN_ERROR(A)
++
++///
++/// ICMP error definitions
++///@{
++#define EFI_NETWORK_UNREACHABLE   EFIERR(100)
++#define EFI_HOST_UNREACHABLE      EFIERR(101)
++#define EFI_PROTOCOL_UNREACHABLE  EFIERR(102)
++#define EFI_PORT_UNREACHABLE      EFIERR(103)
++///@}
++
++///
++/// Tcp connection status definitions
++///@{
++#define EFI_CONNECTION_FIN        EFIERR(104)
++#define EFI_CONNECTION_RESET      EFIERR(105)
++#define EFI_CONNECTION_REFUSED    EFIERR(106)
++///@}
++
++//
++// The EFI memory allocation functions work in units of EFI_PAGEs that are
++// 4KB. This should in no way be confused with the page size of the processor.
++// An EFI_PAGE is just the quanta of memory in EFI.
++//
++#define EFI_PAGE_SIZE             SIZE_4KB
++#define EFI_PAGE_MASK             0xFFF
++#define EFI_PAGE_SHIFT            12
++
++/**
++  Macro that converts a size, in bytes, to a number of EFI_PAGESs.
++
++  @param  Size      A size in bytes.  This parameter is assumed to be type UINTN.
++                    Passing in a parameter that is larger than UINTN may produce
++                    unexpected results.
++
++  @return  The number of EFI_PAGESs associated with the number of bytes specified
++           by Size.
++
++**/
++#define EFI_SIZE_TO_PAGES(Size)  (((Size) >> EFI_PAGE_SHIFT) + (((Size) & EFI_PAGE_MASK) ? 1 : 0))
++
++/**
++  Macro that converts a number of EFI_PAGEs to a size in bytes.
++
++  @param  Pages     The number of EFI_PAGES.  This parameter is assumed to be
++                    type UINTN.  Passing in a parameter that is larger than
++                    UINTN may produce unexpected results.
++
++  @return  The number of bytes associated with the number of EFI_PAGEs specified
++           by Pages.
++
++**/
++#define EFI_PAGES_TO_SIZE(Pages)  ((Pages) << EFI_PAGE_SHIFT)
++
++///
++/// PE32+ Machine type for IA32 UEFI images.
++///
++#define EFI_IMAGE_MACHINE_IA32            0x014C
++
++///
++/// PE32+ Machine type for IA64 UEFI images.
++///
++#define EFI_IMAGE_MACHINE_IA64            0x0200
++
++///
++/// PE32+ Machine type for EBC UEFI images.
++///
++#define EFI_IMAGE_MACHINE_EBC             0x0EBC
++
++///
++/// PE32+ Machine type for X64 UEFI images.
++///
++#define EFI_IMAGE_MACHINE_X64             0x8664
++
++///
++/// PE32+ Machine type for ARM mixed ARM and Thumb/Thumb2 images.
++///
++#define EFI_IMAGE_MACHINE_ARMTHUMB_MIXED  0x01C2
++
++///
++/// PE32+ Machine type for AARCH64 A64 images.
++///
++#define EFI_IMAGE_MACHINE_AARCH64  0xAA64
++
++
++#if   defined (CONFIG_X86)
++  #if defined (CONFIG_64BIT)
++
++    #define EFI_IMAGE_MACHINE_TYPE_SUPPORTED(Machine) \
++      ((Machine) == EFI_IMAGE_MACHINE_X64)
++
++    #define EFI_IMAGE_MACHINE_CROSS_TYPE_SUPPORTED(Machine) ((Machine) == EFI_IMAGE_MACHINE_IA32)
++
++  #else
++
++    #define EFI_IMAGE_MACHINE_TYPE_SUPPORTED(Machine) \
++      ((Machine) == EFI_IMAGE_MACHINE_IA32)
++
++    #define EFI_IMAGE_MACHINE_CROSS_TYPE_SUPPORTED(Machine) ((Machine) == EFI_IMAGE_MACHINE_X64)
++
++  #endif
++
++#elif defined (MDE_CPU_ARM)
++
++#define EFI_IMAGE_MACHINE_TYPE_SUPPORTED(Machine) ((Machine) == EFI_IMAGE_MACHINE_ARMTHUMB_MIXED)
++
++#define EFI_IMAGE_MACHINE_CROSS_TYPE_SUPPORTED(Machine) (FALSE)
++
++#elif defined (MDE_CPU_AARCH64)
++
++#define EFI_IMAGE_MACHINE_TYPE_SUPPORTED(Machine) \
++  ((Machine) == EFI_IMAGE_MACHINE_AARCH64)
++
++#define EFI_IMAGE_MACHINE_CROSS_TYPE_SUPPORTED(Machine) (FALSE)
++
++#elif defined (MDE_CPU_EBC)
++
++///
++/// This is just to make sure you can cross compile with the EBC compiler.
++/// It does not make sense to have a PE loader coded in EBC.
++///
++#define EFI_IMAGE_MACHINE_TYPE_SUPPORTED(Machine) ((Machine) == EFI_IMAGE_MACHINE_EBC)
++
++#define EFI_IMAGE_MACHINE_CROSS_TYPE_SUPPORTED(Machine) (FALSE)
++
++#else
++#error Unknown Processor Type
++#endif
++
++#endif
+diff --git a/include/linux/uefi_multi_phase.h b/include/linux/uefi_multi_phase.h
+new file mode 100644
+index 0000000..318fb40
+--- /dev/null
++++ b/include/linux/uefi_multi_phase.h
+@@ -0,0 +1,87 @@
++/** @file
++  This includes some definitions introduced in UEFI that will be used in both PEI and DXE phases.
++
++Copyright (c) 2006 - 2018, Intel Corporation. All rights reserved.<BR>
++SPDX-License-Identifier: BSD-2-Clause-Patent
++
++**/
++
++#ifndef __UEFI_MULTIPHASE_H__
++#define __UEFI_MULTIPHASE_H__
++
++///
++/// Enumeration of memory types introduced in UEFI.
++///
++typedef enum {
++  ///
++  /// Not used.
++  ///
++  EfiReservedMemoryType,
++  ///
++  /// The code portions of a loaded application.
++  /// (Note that UEFI OS loaders are UEFI applications.)
++  ///
++  EfiLoaderCode,
++  ///
++  /// The data portions of a loaded application and the default data allocation
++  /// type used by an application to allocate pool memory.
++  ///
++  EfiLoaderData,
++  ///
++  /// The code portions of a loaded Boot Services Driver.
++  ///
++  EfiBootServicesCode,
++  ///
++  /// The data portions of a loaded Boot Serves Driver, and the default data
++  /// allocation type used by a Boot Services Driver to allocate pool memory.
++  ///
++  EfiBootServicesData,
++  ///
++  /// The code portions of a loaded Runtime Services Driver.
++  ///
++  EfiRuntimeServicesCode,
++  ///
++  /// The data portions of a loaded Runtime Services Driver and the default
++  /// data allocation type used by a Runtime Services Driver to allocate pool memory.
++  ///
++  EfiRuntimeServicesData,
++  ///
++  /// Free (unallocated) memory.
++  ///
++  EfiConventionalMemory,
++  ///
++  /// Memory in which errors have been detected.
++  ///
++  EfiUnusableMemory,
++  ///
++  /// Memory that holds the ACPI tables.
++  ///
++  EfiACPIReclaimMemory,
++  ///
++  /// Address space reserved for use by the firmware.
++  ///
++  EfiACPIMemoryNVS,
++  ///
++  /// Used by system firmware to request that a memory-mapped IO region
++  /// be mapped by the OS to a virtual address so it can be accessed by EFI runtime services.
++  ///
++  EfiMemoryMappedIO,
++  ///
++  /// System memory-mapped IO region that is used to translate memory
++  /// cycles to IO cycles by the processor.
++  ///
++  EfiMemoryMappedIOPortSpace,
++  ///
++  /// Address space reserved by the firmware for code that is part of the processor.
++  ///
++  EfiPalCode,
++  ///
++  /// A memory region that operates as EfiConventionalMemory,
++  /// however it happens to also support byte-addressable non-volatility.
++  ///
++  EfiPersistentMemory,
++  EfiMaxMemoryType
++} EFI_MEMORY_TYPE;
++
++
++#endif
+diff --git a/include/linux/uefi_pi_bootmode.h b/include/linux/uefi_pi_bootmode.h
+new file mode 100644
+index 0000000..74b499a
+--- /dev/null
++++ b/include/linux/uefi_pi_bootmode.h
+@@ -0,0 +1,36 @@
++/** @file
++  Present the boot mode values in PI.
++
++  Copyright (c) 2006 - 2012, Intel Corporation. All rights reserved.<BR>
++  SPDX-License-Identifier: BSD-2-Clause-Patent
++
++  @par Revision Reference:
++  PI Version 1.2.1A
++
++**/
++
++#ifndef __PI_BOOT_MODE_H__
++#define __PI_BOOT_MODE_H__
++
++///
++/// EFI boot mode
++///
++typedef UINT32  EFI_BOOT_MODE;
++
++//
++// 0x21 - 0xf..f are reserved.
++//
++#define BOOT_WITH_FULL_CONFIGURATION                  0x00
++#define BOOT_WITH_MINIMAL_CONFIGURATION               0x01
++#define BOOT_ASSUMING_NO_CONFIGURATION_CHANGES        0x02
++#define BOOT_WITH_FULL_CONFIGURATION_PLUS_DIAGNOSTICS 0x03
++#define BOOT_WITH_DEFAULT_SETTINGS                    0x04
++#define BOOT_ON_S4_RESUME                             0x05
++#define BOOT_ON_S5_RESUME                             0x06
++#define BOOT_WITH_MFG_MODE_SETTINGS                   0x07
++#define BOOT_ON_S2_RESUME                             0x10
++#define BOOT_ON_S3_RESUME                             0x11
++#define BOOT_ON_FLASH_UPDATE                          0x12
++#define BOOT_IN_RECOVERY_MODE                         0x20
++
++#endif
+diff --git a/include/linux/uefi_pi_hob.h b/include/linux/uefi_pi_hob.h
+new file mode 100644
+index 0000000..b38b15a
+--- /dev/null
++++ b/include/linux/uefi_pi_hob.h
+@@ -0,0 +1,512 @@
++/** @file
++  HOB related definitions in PI.
++
++Copyright (c) 2006 - 2017, Intel Corporation. All rights reserved.<BR>
++SPDX-License-Identifier: BSD-2-Clause-Patent
++
++  @par Revision Reference:
++  PI Version 1.6
++
++**/
++
++#ifndef __PI_HOB_H__
++#define __PI_HOB_H__
++
++//
++// HobType of EFI_HOB_GENERIC_HEADER.
++//
++#define EFI_HOB_TYPE_HANDOFF              0x0001
++#define EFI_HOB_TYPE_MEMORY_ALLOCATION    0x0002
++#define EFI_HOB_TYPE_RESOURCE_DESCRIPTOR  0x0003
++#define EFI_HOB_TYPE_GUID_EXTENSION       0x0004
++#define EFI_HOB_TYPE_FV                   0x0005
++#define EFI_HOB_TYPE_CPU                  0x0006
++#define EFI_HOB_TYPE_MEMORY_POOL          0x0007
++#define EFI_HOB_TYPE_FV2                  0x0009
++#define EFI_HOB_TYPE_LOAD_PEIM_UNUSED     0x000A
++#define EFI_HOB_TYPE_UEFI_CAPSULE         0x000B
++#define EFI_HOB_TYPE_FV3                  0x000C
++#define EFI_HOB_TYPE_UNUSED               0xFFFE
++#define EFI_HOB_TYPE_END_OF_HOB_LIST      0xFFFF
++
++///
++/// Describes the format and size of the data inside the HOB.
++/// All HOBs must contain this generic HOB header.
++///
++typedef struct {
++  ///
++  /// Identifies the HOB data structure type.
++  ///
++  UINT16    HobType;
++  ///
++  /// The length in bytes of the HOB.
++  ///
++  UINT16    HobLength;
++  ///
++  /// This field must always be set to zero.
++  ///
++  UINT32    Reserved;
++} EFI_HOB_GENERIC_HEADER;
++
++
++///
++/// Value of version  in EFI_HOB_HANDOFF_INFO_TABLE.
++///
++#define EFI_HOB_HANDOFF_TABLE_VERSION 0x0009
++
++///
++/// Contains general state information used by the HOB producer phase.
++/// This HOB must be the first one in the HOB list.
++///
++typedef struct {
++  ///
++  /// The HOB generic header. Header.HobType = EFI_HOB_TYPE_HANDOFF.
++  ///
++  EFI_HOB_GENERIC_HEADER  Header;
++  ///
++  /// The version number pertaining to the PHIT HOB definition.
++  /// This value is four bytes in length to provide an 8-byte aligned entry
++  /// when it is combined with the 4-byte BootMode.
++  ///
++  UINT32                  Version;
++  ///
++  /// The system boot mode as determined during the HOB producer phase.
++  ///
++  EFI_BOOT_MODE           BootMode;
++  ///
++  /// The highest address location of memory that is allocated for use by the HOB producer
++  /// phase. This address must be 4-KB aligned to meet page restrictions of UEFI.
++  ///
++  EFI_PHYSICAL_ADDRESS    EfiMemoryTop;
++  ///
++  /// The lowest address location of memory that is allocated for use by the HOB producer phase.
++  ///
++  EFI_PHYSICAL_ADDRESS    EfiMemoryBottom;
++  ///
++  /// The highest address location of free memory that is currently available
++  /// for use by the HOB producer phase.
++  ///
++  EFI_PHYSICAL_ADDRESS    EfiFreeMemoryTop;
++  ///
++  /// The lowest address location of free memory that is available for use by the HOB producer phase.
++  ///
++  EFI_PHYSICAL_ADDRESS    EfiFreeMemoryBottom;
++  ///
++  /// The end of the HOB list.
++  ///
++  EFI_PHYSICAL_ADDRESS    EfiEndOfHobList;
++} EFI_HOB_HANDOFF_INFO_TABLE;
++
++///
++/// EFI_HOB_MEMORY_ALLOCATION_HEADER describes the
++/// various attributes of the logical memory allocation. The type field will be used for
++/// subsequent inclusion in the UEFI memory map.
++///
++typedef struct {
++  ///
++  /// A GUID that defines the memory allocation region's type and purpose, as well as
++  /// other fields within the memory allocation HOB. This GUID is used to define the
++  /// additional data within the HOB that may be present for the memory allocation HOB.
++  /// Type EFI_GUID is defined in InstallProtocolInterface() in the UEFI 2.0
++  /// specification.
++  ///
++  EFI_GUID              Name;
++
++  ///
++  /// The base address of memory allocated by this HOB. Type
++  /// EFI_PHYSICAL_ADDRESS is defined in AllocatePages() in the UEFI 2.0
++  /// specification.
++  ///
++  EFI_PHYSICAL_ADDRESS  MemoryBaseAddress;
++
++  ///
++  /// The length in bytes of memory allocated by this HOB.
++  ///
++  UINT64                MemoryLength;
++
++  ///
++  /// Defines the type of memory allocated by this HOB. The memory type definition
++  /// follows the EFI_MEMORY_TYPE definition. Type EFI_MEMORY_TYPE is defined
++  /// in AllocatePages() in the UEFI 2.0 specification.
++  ///
++  EFI_MEMORY_TYPE       MemoryType;
++
++  ///
++  /// Padding for Itanium processor family
++  ///
++  UINT8                 Reserved[4];
++} EFI_HOB_MEMORY_ALLOCATION_HEADER;
++
++///
++/// Describes all memory ranges used during the HOB producer
++/// phase that exist outside the HOB list. This HOB type
++/// describes how memory is used, not the physical attributes of memory.
++///
++typedef struct {
++  ///
++  /// The HOB generic header. Header.HobType = EFI_HOB_TYPE_MEMORY_ALLOCATION.
++  ///
++  EFI_HOB_GENERIC_HEADER            Header;
++  ///
++  /// An instance of the EFI_HOB_MEMORY_ALLOCATION_HEADER that describes the
++  /// various attributes of the logical memory allocation.
++  ///
++  EFI_HOB_MEMORY_ALLOCATION_HEADER  AllocDescriptor;
++  //
++  // Additional data pertaining to the "Name" Guid memory
++  // may go here.
++  //
++} EFI_HOB_MEMORY_ALLOCATION;
++
++
++///
++/// Describes the memory stack that is produced by the HOB producer
++/// phase and upon which all post-memory-installed executable
++/// content in the HOB producer phase is executing.
++///
++typedef struct {
++  ///
++  /// The HOB generic header. Header.HobType = EFI_HOB_TYPE_MEMORY_ALLOCATION.
++  ///
++  EFI_HOB_GENERIC_HEADER            Header;
++  ///
++  /// An instance of the EFI_HOB_MEMORY_ALLOCATION_HEADER that describes the
++  /// various attributes of the logical memory allocation.
++  ///
++  EFI_HOB_MEMORY_ALLOCATION_HEADER  AllocDescriptor;
++} EFI_HOB_MEMORY_ALLOCATION_STACK;
++
++///
++/// Defines the location of the boot-strap
++/// processor (BSP) BSPStore ("Backing Store Pointer Store").
++/// This HOB is valid for the Itanium processor family only
++/// register overflow store.
++///
++typedef struct {
++  ///
++  /// The HOB generic header. Header.HobType = EFI_HOB_TYPE_MEMORY_ALLOCATION.
++  ///
++  EFI_HOB_GENERIC_HEADER            Header;
++  ///
++  /// An instance of the EFI_HOB_MEMORY_ALLOCATION_HEADER that describes the
++  /// various attributes of the logical memory allocation.
++  ///
++  EFI_HOB_MEMORY_ALLOCATION_HEADER  AllocDescriptor;
++} EFI_HOB_MEMORY_ALLOCATION_BSP_STORE;
++
++///
++/// Defines the location and entry point of the HOB consumer phase.
++///
++typedef struct {
++  ///
++  /// The HOB generic header. Header.HobType = EFI_HOB_TYPE_MEMORY_ALLOCATION.
++  ///
++  EFI_HOB_GENERIC_HEADER            Header;
++  ///
++  /// An instance of the EFI_HOB_MEMORY_ALLOCATION_HEADER that describes the
++  /// various attributes of the logical memory allocation.
++  ///
++  EFI_HOB_MEMORY_ALLOCATION_HEADER  MemoryAllocationHeader;
++  ///
++  /// The GUID specifying the values of the firmware file system name
++  /// that contains the HOB consumer phase component.
++  ///
++  EFI_GUID                          ModuleName;
++  ///
++  /// The address of the memory-mapped firmware volume
++  /// that contains the HOB consumer phase firmware file.
++  ///
++  EFI_PHYSICAL_ADDRESS              EntryPoint;
++} EFI_HOB_MEMORY_ALLOCATION_MODULE;
++
++///
++/// The resource type.
++///
++typedef UINT32 EFI_RESOURCE_TYPE;
++
++//
++// Value of ResourceType in EFI_HOB_RESOURCE_DESCRIPTOR.
++//
++#define EFI_RESOURCE_SYSTEM_MEMORY          0x00000000
++#define EFI_RESOURCE_MEMORY_MAPPED_IO       0x00000001
++#define EFI_RESOURCE_IO                     0x00000002
++#define EFI_RESOURCE_FIRMWARE_DEVICE        0x00000003
++#define EFI_RESOURCE_MEMORY_MAPPED_IO_PORT  0x00000004
++#define EFI_RESOURCE_MEMORY_RESERVED        0x00000005
++#define EFI_RESOURCE_IO_RESERVED            0x00000006
++#define EFI_RESOURCE_MAX_MEMORY_TYPE        0x00000007
++
++///
++/// A type of recount attribute type.
++///
++typedef UINT32 EFI_RESOURCE_ATTRIBUTE_TYPE;
++
++//
++// These types can be ORed together as needed.
++//
++// The following attributes are used to describe settings
++//
++#define EFI_RESOURCE_ATTRIBUTE_PRESENT                  0x00000001
++#define EFI_RESOURCE_ATTRIBUTE_INITIALIZED              0x00000002
++#define EFI_RESOURCE_ATTRIBUTE_TESTED                   0x00000004
++#define EFI_RESOURCE_ATTRIBUTE_READ_PROTECTED           0x00000080
++//
++// This is typically used as memory cacheability attribute today.
++// NOTE: Since PI spec 1.4, please use EFI_RESOURCE_ATTRIBUTE_READ_ONLY_PROTECTED
++// as Physical write protected attribute, and EFI_RESOURCE_ATTRIBUTE_WRITE_PROTECTED
++// means Memory cacheability attribute: The memory supports being programmed with
++// a writeprotected cacheable attribute.
++//
++#define EFI_RESOURCE_ATTRIBUTE_WRITE_PROTECTED          0x00000100
++#define EFI_RESOURCE_ATTRIBUTE_EXECUTION_PROTECTED      0x00000200
++#define EFI_RESOURCE_ATTRIBUTE_PERSISTENT               0x00800000
++//
++// The rest of the attributes are used to describe capabilities
++//
++#define EFI_RESOURCE_ATTRIBUTE_SINGLE_BIT_ECC           0x00000008
++#define EFI_RESOURCE_ATTRIBUTE_MULTIPLE_BIT_ECC         0x00000010
++#define EFI_RESOURCE_ATTRIBUTE_ECC_RESERVED_1           0x00000020
++#define EFI_RESOURCE_ATTRIBUTE_ECC_RESERVED_2           0x00000040
++#define EFI_RESOURCE_ATTRIBUTE_UNCACHEABLE              0x00000400
++#define EFI_RESOURCE_ATTRIBUTE_WRITE_COMBINEABLE        0x00000800
++#define EFI_RESOURCE_ATTRIBUTE_WRITE_THROUGH_CACHEABLE  0x00001000
++#define EFI_RESOURCE_ATTRIBUTE_WRITE_BACK_CACHEABLE     0x00002000
++#define EFI_RESOURCE_ATTRIBUTE_16_BIT_IO                0x00004000
++#define EFI_RESOURCE_ATTRIBUTE_32_BIT_IO                0x00008000
++#define EFI_RESOURCE_ATTRIBUTE_64_BIT_IO                0x00010000
++#define EFI_RESOURCE_ATTRIBUTE_UNCACHED_EXPORTED        0x00020000
++#define EFI_RESOURCE_ATTRIBUTE_READ_PROTECTABLE         0x00100000
++//
++// This is typically used as memory cacheability attribute today.
++// NOTE: Since PI spec 1.4, please use EFI_RESOURCE_ATTRIBUTE_READ_ONLY_PROTECTABLE
++// as Memory capability attribute: The memory supports being protected from processor
++// writes, and EFI_RESOURCE_ATTRIBUTE_WRITE_PROTEC TABLE means Memory cacheability attribute:
++// The memory supports being programmed with a writeprotected cacheable attribute.
++//
++#define EFI_RESOURCE_ATTRIBUTE_WRITE_PROTECTABLE        0x00200000
++#define EFI_RESOURCE_ATTRIBUTE_EXECUTION_PROTECTABLE    0x00400000
++#define EFI_RESOURCE_ATTRIBUTE_PERSISTABLE              0x01000000
++
++#define EFI_RESOURCE_ATTRIBUTE_READ_ONLY_PROTECTED      0x00040000
++#define EFI_RESOURCE_ATTRIBUTE_READ_ONLY_PROTECTABLE    0x00080000
++
++//
++// Physical memory relative reliability attribute. This
++// memory provides higher reliability relative to other
++// memory in the system. If all memory has the same
++// reliability, then this bit is not used.
++//
++#define EFI_RESOURCE_ATTRIBUTE_MORE_RELIABLE            0x02000000
++
++///
++/// Describes the resource properties of all fixed,
++/// nonrelocatable resource ranges found on the processor
++/// host bus during the HOB producer phase.
++///
++typedef struct {
++  ///
++  /// The HOB generic header. Header.HobType = EFI_HOB_TYPE_RESOURCE_DESCRIPTOR.
++  ///
++  EFI_HOB_GENERIC_HEADER      Header;
++  ///
++  /// A GUID representing the owner of the resource. This GUID is used by HOB
++  /// consumer phase components to correlate device ownership of a resource.
++  ///
++  EFI_GUID                    Owner;
++  ///
++  /// The resource type enumeration as defined by EFI_RESOURCE_TYPE.
++  ///
++  EFI_RESOURCE_TYPE           ResourceType;
++  ///
++  /// Resource attributes as defined by EFI_RESOURCE_ATTRIBUTE_TYPE.
++  ///
++  EFI_RESOURCE_ATTRIBUTE_TYPE ResourceAttribute;
++  ///
++  /// The physical start address of the resource region.
++  ///
++  EFI_PHYSICAL_ADDRESS        PhysicalStart;
++  ///
++  /// The number of bytes of the resource region.
++  ///
++  UINT64                      ResourceLength;
++} EFI_HOB_RESOURCE_DESCRIPTOR;
++
++///
++/// Allows writers of executable content in the HOB producer phase to
++/// maintain and manage HOBs with specific GUID.
++///
++typedef struct {
++  ///
++  /// The HOB generic header. Header.HobType = EFI_HOB_TYPE_GUID_EXTENSION.
++  ///
++  EFI_HOB_GENERIC_HEADER      Header;
++  ///
++  /// A GUID that defines the contents of this HOB.
++  ///
++  EFI_GUID                    Name;
++  //
++  // Guid specific data goes here
++  //
++} EFI_HOB_GUID_TYPE;
++
++///
++/// Details the location of firmware volumes that contain firmware files.
++///
++typedef struct {
++  ///
++  /// The HOB generic header. Header.HobType = EFI_HOB_TYPE_FV.
++  ///
++  EFI_HOB_GENERIC_HEADER Header;
++  ///
++  /// The physical memory-mapped base address of the firmware volume.
++  ///
++  EFI_PHYSICAL_ADDRESS   BaseAddress;
++  ///
++  /// The length in bytes of the firmware volume.
++  ///
++  UINT64                 Length;
++} EFI_HOB_FIRMWARE_VOLUME;
++
++///
++/// Details the location of a firmware volume that was extracted
++/// from a file within another firmware volume.
++///
++typedef struct {
++  ///
++  /// The HOB generic header. Header.HobType = EFI_HOB_TYPE_FV2.
++  ///
++  EFI_HOB_GENERIC_HEADER  Header;
++  ///
++  /// The physical memory-mapped base address of the firmware volume.
++  ///
++  EFI_PHYSICAL_ADDRESS    BaseAddress;
++  ///
++  /// The length in bytes of the firmware volume.
++  ///
++  UINT64                  Length;
++  ///
++  /// The name of the firmware volume.
++  ///
++  EFI_GUID                FvName;
++  ///
++  /// The name of the firmware file that contained this firmware volume.
++  ///
++  EFI_GUID                FileName;
++} EFI_HOB_FIRMWARE_VOLUME2;
++
++///
++/// Details the location of a firmware volume that was extracted
++/// from a file within another firmware volume.
++///
++typedef struct {
++  ///
++  /// The HOB generic header. Header.HobType = EFI_HOB_TYPE_FV3.
++  ///
++  EFI_HOB_GENERIC_HEADER  Header;
++  ///
++  /// The physical memory-mapped base address of the firmware volume.
++  ///
++  EFI_PHYSICAL_ADDRESS    BaseAddress;
++  ///
++  /// The length in bytes of the firmware volume.
++  ///
++  UINT64                  Length;
++  ///
++  /// The authentication status.
++  ///
++  UINT32                  AuthenticationStatus;
++  ///
++  /// TRUE if the FV was extracted as a file within another firmware volume.
++  /// FALSE otherwise.
++  ///
++  BOOLEAN                 ExtractedFv;
++  ///
++  /// The name of the firmware volume.
++  /// Valid only if IsExtractedFv is TRUE.
++  ///
++  EFI_GUID                FvName;
++  ///
++  /// The name of the firmware file that contained this firmware volume.
++  /// Valid only if IsExtractedFv is TRUE.
++  ///
++  EFI_GUID                FileName;
++} EFI_HOB_FIRMWARE_VOLUME3;
++
++///
++/// Describes processor information, such as address space and I/O space capabilities.
++///
++typedef struct {
++  ///
++  /// The HOB generic header. Header.HobType = EFI_HOB_TYPE_CPU.
++  ///
++  EFI_HOB_GENERIC_HEADER  Header;
++  ///
++  /// Identifies the maximum physical memory addressability of the processor.
++  ///
++  UINT8                   SizeOfMemorySpace;
++  ///
++  /// Identifies the maximum physical I/O addressability of the processor.
++  ///
++  UINT8                   SizeOfIoSpace;
++  ///
++  /// This field will always be set to zero.
++  ///
++  UINT8                   Reserved[6];
++} EFI_HOB_CPU;
++
++
++///
++/// Describes pool memory allocations.
++///
++typedef struct {
++  ///
++  /// The HOB generic header. Header.HobType = EFI_HOB_TYPE_MEMORY_POOL.
++  ///
++  EFI_HOB_GENERIC_HEADER  Header;
++} EFI_HOB_MEMORY_POOL;
++
++///
++/// Each UEFI capsule HOB details the location of a UEFI capsule. It includes a base address and length
++/// which is based upon memory blocks with a EFI_CAPSULE_HEADER and the associated
++/// CapsuleImageSize-based payloads. These HOB's shall be created by the PEI PI firmware
++/// sometime after the UEFI UpdateCapsule service invocation with the
++/// CAPSULE_FLAGS_POPULATE_SYSTEM_TABLE flag set in the EFI_CAPSULE_HEADER.
++///
++typedef struct {
++  ///
++  /// The HOB generic header where Header.HobType = EFI_HOB_TYPE_UEFI_CAPSULE.
++  ///
++  EFI_HOB_GENERIC_HEADER Header;
++
++  ///
++  /// The physical memory-mapped base address of an UEFI capsule. This value is set to
++  /// point to the base of the contiguous memory of the UEFI capsule.
++  /// The length of the contiguous memory in bytes.
++  ///
++  EFI_PHYSICAL_ADDRESS   BaseAddress;
++  UINT64                 Length;
++} EFI_HOB_UEFI_CAPSULE;
++
++///
++/// Union of all the possible HOB Types.
++///
++typedef union {
++  EFI_HOB_GENERIC_HEADER              *Header;
++  EFI_HOB_HANDOFF_INFO_TABLE          *HandoffInformationTable;
++  EFI_HOB_MEMORY_ALLOCATION           *MemoryAllocation;
++  EFI_HOB_MEMORY_ALLOCATION_BSP_STORE *MemoryAllocationBspStore;
++  EFI_HOB_MEMORY_ALLOCATION_STACK     *MemoryAllocationStack;
++  EFI_HOB_MEMORY_ALLOCATION_MODULE    *MemoryAllocationModule;
++  EFI_HOB_RESOURCE_DESCRIPTOR         *ResourceDescriptor;
++  EFI_HOB_GUID_TYPE                   *Guid;
++  EFI_HOB_FIRMWARE_VOLUME             *FirmwareVolume;
++  EFI_HOB_FIRMWARE_VOLUME2            *FirmwareVolume2;
++  EFI_HOB_FIRMWARE_VOLUME3            *FirmwareVolume3;
++  EFI_HOB_CPU                         *Cpu;
++  EFI_HOB_MEMORY_POOL                 *Pool;
++  EFI_HOB_UEFI_CAPSULE                *Capsule;
++  UINT8                               *Raw;
++} EFI_PEI_HOB_POINTERS;
++
++
++#endif
+-- 
+2.7.4
+
