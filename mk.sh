@@ -3,7 +3,7 @@
 echo Checkout out busybox ...
 if [ -d "busybox_upld" ]; then
 	cd busybox_upld
-	git checkout 1_28_0 -f
+	git checkout 1_32_0 -f
 else
 	git clone --depth 1 --branch 1_32_0  https://github.com/mirror/busybox.git busybox_upld
 	cd busybox_upld
@@ -12,7 +12,7 @@ fi
 echo Applying patch ...
 git am --ignore-space-change ../patch/0001-Add-minimal-config-file-for-busybox.patch
 
-echo Compling busybox ...
+echo Compiling busybox ...
 make mini_defconfig
 make install -j8
 cd ..
@@ -24,7 +24,7 @@ fi
 if [ ! -d "output" ]; then
 	mkdir output
 fi
-cd initramfs
+
 cd initramfs
 mkdir -p bin lib dev home root sbin etc tmp proc sys usr/bin usr/sbin
 cp -a ../busybox_upld/_install/* .
@@ -46,7 +46,7 @@ fi
 echo Applying patch ...
 git am --ignore-space-change ../patch/0001-Enable-universal-payload-x64-kernel.patch
 
-echo Compling kernel ...
+echo Compiling kernel ...
 ./build
 cd ../
 cp linux_upld/arch/x86/boot/bzImage output
