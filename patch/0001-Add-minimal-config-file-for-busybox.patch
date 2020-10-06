@@ -1,8 +1,11 @@
-From be0e529066e61fa0b4b26a9e18a54f6ba9fbf8a4 Mon Sep 17 00:00:00 2001
+From c1e780491a6555faca03a354eb3c968412f8b0ee Mon Sep 17 00:00:00 2001
 From: Maurice Ma <maurice.ma@intel.com>
 Date: Fri, 2 Oct 2020 15:09:40 -0700
-Subject: [PATCH] Add mini config
+Subject: [PATCH] Add minimal config file for busybox
 
+Provide config file to build basic busybox.
+
+Signed-off-by: Maurice Ma <maurice.ma@intel.com>
 ---
  configs/mini_defconfig | 1143 ++++++++++++++++++++++++++++++++++++++++++++++++
  1 file changed, 1143 insertions(+)

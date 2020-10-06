@@ -1,7 +1,10 @@
-From 0150ac6dfe0eaeb452dbd9b783a59ec06953264a Mon Sep 17 00:00:00 2001
+From a4de298bef7f7c49094ebdcde5545995bed0a84e Mon Sep 17 00:00:00 2001
 From: Maurice Ma <maurice.ma@intel.com>
 Date: Fri, 2 Oct 2020 14:44:34 -0700
 Subject: [PATCH] Enable universal payload x64 kernel
+
+This patch reused the UEFI stub entry point to run stub for
+universal payload.
 
 Signed-off-by: Maurice Ma <maurice.ma@intel.com>
 ---
@@ -3242,7 +3245,7 @@ index 85050f5..b35b659 100644
  #endif
 diff --git a/drivers/firmware/efi/libstub/upayload.c b/drivers/firmware/efi/libstub/upayload.c
 new file mode 100644
-index 0000000..af56582
+index 0000000..aa68aec
 --- /dev/null
 +++ b/drivers/firmware/efi/libstub/upayload.c
 @@ -0,0 +1,427 @@
@@ -3494,7 +3497,7 @@ index 0000000..af56582
 +  Buf[0] = '0';
 +  Buf[1] = 'x';
 +  for (i = 2; i < 10; i++) {
-+    ch = (Val >> 28) & 0x0F;  
++    ch = (Val >> 28) & 0x0F;
 +    if (ch > 9) ch = ch - 10 + 'a';
 +    else ch = ch + '0';
 +    Buf[i] = ch;

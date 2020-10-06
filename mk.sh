@@ -5,12 +5,12 @@ if [ -d "busybox_upld" ]; then
 	cd busybox_upld
 	git checkout 1_28_0 -f
 else
-	git clone --depth 1 --branch 1_28_0  https://github.com/mirror/busybox.git busybox_upld
+	git clone --depth 1 --branch 1_32_0  https://github.com/mirror/busybox.git busybox_upld
 	cd busybox_upld
 fi
 
 echo Applying patch ...
-git am --ignore-space-change ../patch/0001-Add-mini-config.patch
+git am --ignore-space-change ../patch/0001-Add-minimal-config-file-for-busybox.patch
 
 echo Compling busybox ...
 make mini_defconfig
@@ -49,4 +49,5 @@ git am --ignore-space-change ../patch/0001-Enable-universal-payload-x64-kernel.p
 echo Compling kernel ...
 ./build
 cd ../
+cp linux_upld/arch/x86/boot/bzImage output
 
