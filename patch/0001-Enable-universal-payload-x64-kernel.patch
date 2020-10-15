@@ -1,4 +1,4 @@
-From a4de298bef7f7c49094ebdcde5545995bed0a84e Mon Sep 17 00:00:00 2001
+From 01b8632aadbe6e7e31d5a5f9b29f22df7976ba30 Mon Sep 17 00:00:00 2001
 From: Maurice Ma <maurice.ma@intel.com>
 Date: Fri, 2 Oct 2020 14:44:34 -0700
 Subject: [PATCH] Enable universal payload x64 kernel
@@ -14,7 +14,7 @@ Signed-off-by: Maurice Ma <maurice.ma@intel.com>
  build                                      |    5 +
  drivers/firmware/efi/libstub/Makefile      |    2 +-
  drivers/firmware/efi/libstub/efistub.h     |    3 +
- drivers/firmware/efi/libstub/upayload.c    |  427 +++++
+ drivers/firmware/efi/libstub/upayload.c    |  416 +++++
  drivers/firmware/efi/libstub/upayload.h    |  277 ++++
  drivers/firmware/efi/libstub/x86-stub.c    |    5 +
  include/linux/uefi_base.h                  | 1319 +++++++++++++++
@@ -22,7 +22,7 @@ Signed-off-by: Maurice Ma <maurice.ma@intel.com>
  include/linux/uefi_multi_phase.h           |   87 +
  include/linux/uefi_pi_bootmode.h           |   36 +
  include/linux/uefi_pi_hob.h                |  512 ++++++
- 14 files changed, 6102 insertions(+), 3 deletions(-)
+ 14 files changed, 6091 insertions(+), 3 deletions(-)
  create mode 100644 arch/x86/configs/upld_defconfig
  create mode 100644 arch/x86/include/asm/uefi_processor_bind.h
  create mode 100755 build
@@ -3232,23 +3232,23 @@ index 75daaf2..6486722 100644
  # include the stub's generic dependencies from lib/ when building for ARM/arm64
  efi-deps-y := fdt_rw.c fdt_ro.c fdt_wip.c fdt.c fdt_empty_tree.c fdt_sw.c
 diff --git a/drivers/firmware/efi/libstub/efistub.h b/drivers/firmware/efi/libstub/efistub.h
-index 85050f5..b35b659 100644
+index 85050f5..7c13861 100644
 --- a/drivers/firmware/efi/libstub/efistub.h
 +++ b/drivers/firmware/efi/libstub/efistub.h
 @@ -795,4 +795,7 @@ asmlinkage void __noreturn efi_enter_kernel(unsigned long entrypoint,
  
  void efi_handle_post_ebs_state(void);
  
-+struct boot_params *setup_boot_params(void *hob_list);
++struct boot_params *setup_boot_params(void *hob_list, void *image_base);
 +void   upld_stub_entry (unsigned long image_base, struct boot_params *bp);
 +
  #endif
 diff --git a/drivers/firmware/efi/libstub/upayload.c b/drivers/firmware/efi/libstub/upayload.c
 new file mode 100644
-index 0000000..aa68aec
+index 0000000..11b5712
 --- /dev/null
 +++ b/drivers/firmware/efi/libstub/upayload.c
-@@ -0,0 +1,427 @@
+@@ -0,0 +1,416 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +
 +/* -----------------------------------------------------------------------
@@ -3629,7 +3629,8 @@ index 0000000..aa68aec
 +
 +struct boot_params *
 +EFIAPI
-+setup_boot_params(void *HobList)
++setup_boot_params(void *HobList, void *ImageBase)
++
 +{
 +  EFI_STATUS                  Status;
 +  UINT8                      *Ptr;
@@ -3647,29 +3648,17 @@ index 0000000..aa68aec
 +    return NULL;
 +  }
 +
-+  Ptr = (UINT8 *)((UINTN)&_head & ~(SIZE_4KB - 1));
-+  End = Ptr - SIZE_64KB;
-+  while (Ptr > End) {
-+    Bp = (BOOT_PARAMS *)Ptr;
-+    if ((Bp->Hdr.Signature == 0xAA55) && (Bp->Hdr.Header == SETUP_HDR)) {
-+      break;
-+    }
-+    Ptr -= SIZE_4KB;
++  if ((ImageBase == NULL) || (*(UINT16 *)ImageBase != 0x5a4d)) {
++    return NULL;
 +  }
 +
-+  if (Ptr > End) {
-+    strcpy (gCmdLineBuf, DEF_CMD_LINE);
-+    Status = UpldLoadBzImage ((VOID*)Bp, NULL, 0, gCmdLineBuf, MAX_CMD_LINE_LEN);
-+    if (Status == 0) {
-+      UpldLinuxBoot (HobList, (VOID *)Bp);
-+    } else {
-+      Bp = NULL;
-+    }
++  Bp  = (BOOT_PARAMS *)ImageBase;
++
++  strcpy (gCmdLineBuf, DEF_CMD_LINE);
++  Status = UpldLoadBzImage ((VOID*)Bp, NULL, 0, gCmdLineBuf, MAX_CMD_LINE_LEN);
++  if (Status == 0) {
++    UpldLinuxBoot (HobList, (VOID *)Bp);
 +  } else {
-+    Bp = NULL;
-+  }
-+
-+  if (Bp == NULL) {
 +    while (1)
 +      asm("hlt");
 +  }
@@ -3960,15 +3949,15 @@ index 0000000..bb1e04e
 +
 +#endif
 diff --git a/drivers/firmware/efi/libstub/x86-stub.c b/drivers/firmware/efi/libstub/x86-stub.c
-index 3672539..1c1a791 100644
+index 3672539..d69ccc0 100644
 --- a/drivers/firmware/efi/libstub/x86-stub.c
 +++ b/drivers/firmware/efi/libstub/x86-stub.c
 @@ -363,6 +363,11 @@ efi_status_t __efiapi efi_pe_entry(efi_handle_t handle,
  	efi_status_t status;
  	char *cmdline_ptr;
  
-+  boot_params = setup_boot_params((void *)handle);
-+  if (boot_params != NULL) {
++	boot_params = setup_boot_params((void *)handle, (void*)sys_table_arg);
++	if (boot_params != NULL) {
 +		upld_stub_entry (boot_params->hdr.pref_address, boot_params);
 +	}
 +
