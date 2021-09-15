@@ -14,9 +14,9 @@ To build Linux payload, please follow the steps below:
 
   - Clone repo (https://github.com/universalpayload/linuxpayload.git) into "linuxpayload" folder.
 
-  - Clone repo (https://github.com/universalpayload/tools.git) into "tools" folder, checkout "universal_payload" branch.
+  - Clone repo (https://github.com/universalpayload/tools.git) into "tools" folder.
 
-  - Clone repo (https://github.com/universalpayload/slimbootloader.git) into "slimboot" folder, checkout "universal_payload" branch.
+  - Clone repo (https://github.com/universalpayload/slimbootloader.git) into "slimboot" folder, checkout "dcd9de45e9d3137214338952be93b5372a0ab619" commit.
 
 - Switch into "linuxpayload" folder and run "mk.sh" from root. It will build busybox initramfs image and Linux kernel EFI image.
 

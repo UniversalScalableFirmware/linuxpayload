@@ -42,14 +42,14 @@ index 97d37f0..b76e316 100644
   * the page directory. [According to comments etc elsewhere on a compressed
   * kernel it will end up at 0x1000 + 1Mb I hope so as I assume this. - AC]
   *
-- * Page 0 is deliberately kept safe, since System Management Mode code in 
+- * Page 0 is deliberately kept safe, since System Management Mode code in
 + * Page 0 is deliberately kept safe, since System Management Mode code in
   * laptops may need to access the BIOS data stored there.  This is also
-- * useful for future device drivers that either access the BIOS via VM86 
+- * useful for future device drivers that either access the BIOS via VM86
 + * useful for future device drivers that either access the BIOS via VM86
   * mode.
   */
- 
+
 @@ -522,6 +522,13 @@ SYM_FUNC_START_ALIAS(efi_stub_entry)
  	jmp	*%rax
  SYM_FUNC_END(efi64_stub_entry)
@@ -62,7 +62,7 @@ index 97d37f0..b76e316 100644
 +	jmp  	*%rax
 +SYM_FUNC_END(upld_stub_entry)
  #endif
- 
+
  	.text
 diff --git a/arch/x86/configs/upld_defconfig b/arch/x86/configs/upld_defconfig
 new file mode 100644
@@ -3216,7 +3216,7 @@ index 0000000..3f1b963
 +#!/bin/bash
 +
 +make upld_defconfig
-+make ARCH=x86_64 bzImage -j 8
++make ARCH=x86_64 "KCFLAGS=-mno-movbe" bzImage -j 8
 +
 diff --git a/drivers/firmware/efi/libstub/Makefile b/drivers/firmware/efi/libstub/Makefile
 index 75daaf2..6486722 100644
@@ -3228,7 +3228,7 @@ index 75daaf2..6486722 100644
  				   skip_spaces.o lib-cmdline.o lib-ctype.o \
 -				   alignedmem.o relocate.o vsprintf.o
 +				   alignedmem.o relocate.o vsprintf.o upayload.o
- 
+
  # include the stub's generic dependencies from lib/ when building for ARM/arm64
  efi-deps-y := fdt_rw.c fdt_ro.c fdt_wip.c fdt.c fdt_empty_tree.c fdt_sw.c
 diff --git a/drivers/firmware/efi/libstub/efistub.h b/drivers/firmware/efi/libstub/efistub.h
@@ -3236,9 +3236,9 @@ index 85050f5..7c13861 100644
 --- a/drivers/firmware/efi/libstub/efistub.h
 +++ b/drivers/firmware/efi/libstub/efistub.h
 @@ -795,4 +795,7 @@ asmlinkage void __noreturn efi_enter_kernel(unsigned long entrypoint,
- 
+
  void efi_handle_post_ebs_state(void);
- 
+
 +struct boot_params *setup_boot_params(void *hob_list, void *image_base);
 +void   upld_stub_entry (unsigned long image_base, struct boot_params *bp);
 +
@@ -3955,14 +3955,14 @@ index 3672539..d69ccc0 100644
 @@ -363,6 +363,11 @@ efi_status_t __efiapi efi_pe_entry(efi_handle_t handle,
  	efi_status_t status;
  	char *cmdline_ptr;
- 
+
 +	boot_params = setup_boot_params((void *)handle, (void*)sys_table_arg);
 +	if (boot_params != NULL) {
 +		upld_stub_entry (boot_params->hdr.pref_address, boot_params);
 +	}
 +
  	efi_system_table = sys_table_arg;
- 
+
  	/* Check if we were booted by the EFI firmware */
 diff --git a/include/linux/uefi_base.h b/include/linux/uefi_base.h
 new file mode 100644
@@ -6238,6 +6238,6 @@ index 0000000..b38b15a
 +
 +
 +#endif
--- 
+--
 2.7.4
 
